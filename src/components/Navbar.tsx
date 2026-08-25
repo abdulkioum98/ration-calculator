@@ -12,18 +12,29 @@ export default function Navbar({ onOpenSidebar, onGoHome, onGoCalculator, hasCow
   return (
     <header className="bg-emerald-700 text-white p-4 flex justify-between items-center shadow-md sticky top-0 z-20">
       <div className="flex items-center space-x-3">
-        <button onClick={onOpenSidebar} className="text-2xl focus:outline-none p-1">
+        <button onClick={onOpenSidebar} className="text-2xl focus:outline-none p-1 hover:bg-emerald-800 rounded-lg transition">
           <Menu size={24} />
         </button>
-        <h1 className="text-lg font-bold">Cattle Ration Calc</h1>
+        
+        {/* Brand Logo & Title */}
+        <div 
+          onClick={onGoHome} 
+          className="flex items-center space-x-2.5 cursor-pointer select-none"
+        >
+          <img 
+            src="/ration-calculator-logo.png" 
+            alt="Ration Calculator Logo" 
+            className="w-8 h-8 rounded-lg object-contain bg-white/10 p-0.5 border border-white/20 shadow-xs"
+          />
+          <h1 className="text-lg font-bold tracking-tight">Cattle Ration Calc</h1>
+        </div>
       </div>
       
       <div className="flex items-center space-x-2">
-        {/* গরুর ডাটা সেভ থাকলে সরাসরি ক্যালকুলেটরে ফেরার বাটন */}
         {hasCowData && (
           <button 
             onClick={onGoCalculator} 
-            className="bg-emerald-800 hover:bg-emerald-900 text-white px-2.5 py-1 rounded-lg text-xs font-semibold flex items-center space-x-1 transition"
+            className="bg-emerald-800 hover:bg-emerald-900 text-white px-2.5 py-1.5 rounded-lg text-xs font-semibold flex items-center space-x-1 transition shadow-xs"
             title="Go to Calculator"
           >
             <Calculator size={16} />
@@ -31,7 +42,11 @@ export default function Navbar({ onOpenSidebar, onGoHome, onGoCalculator, hasCow
           </button>
         )}
         
-        <button onClick={onGoHome} className="text-xl p-1" title="Home">
+        <button 
+          onClick={onGoHome} 
+          className="text-xl p-1.5 hover:bg-emerald-800 rounded-lg transition" 
+          title="Home"
+        >
           <Home size={22} />
         </button>
       </div>
