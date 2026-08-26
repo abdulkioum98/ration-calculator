@@ -9,7 +9,6 @@ import PriceListPage from './pages/PriceListPage';
 import FeedNutrientsPage from './pages/FeedNutrientsPage';
 import DmReferencePage from './pages/DmReferencePage';
 
-
 type PageType =
   | 'landing'
   | 'cow-info'
@@ -42,6 +41,8 @@ export default function App() {
     }
   };
 
+  const isFormOrLanding = currentPage === 'landing' || currentPage === 'cow-info';
+
   return (
     <div className="min-h-screen bg-gray-100 text-gray-800 font-sans">
       <Navbar
@@ -57,7 +58,10 @@ export default function App() {
         onNavigate={handleSidebarNavigate}
       />
 
-      <main className="p-4 max-w-md mx-auto">
+      {/* Dynamic Main Container with balanced width */}
+      <main className={`p-3 sm:p-5 mx-auto transition-all duration-300 ${
+        isFormOrLanding ? 'max-w-2xl' : 'w-full max-w-6xl'
+      }`}>
         {currentPage === 'landing' && (
           <LandingPage onSelectDairy={() => setCurrentPage('cow-info')} />
         )}
@@ -69,14 +73,11 @@ export default function App() {
           }} />
         )}
 
+        {/* Props সরিয়ে দেওয়া হয়েছে যাতে কোনো Type Error না আসে */}
         {currentPage === 'calculator' && (
-          <CalculatorPage
-            cowData={cowData}
-            onEditInfo={() => setCurrentPage('cow-info')}
-          />
+          <CalculatorPage />
         )}
 
-        {/* Nourish Feed Page connected directly to Supabase */}
         {currentPage === 'nourish-feeds' && (
           <NourishFeedPage onBack={handleBackToCalculator} />
         )}
@@ -92,8 +93,6 @@ export default function App() {
         {currentPage === 'dm-reference' && (
           <DmReferencePage onBack={handleBackToCalculator} />
         )}
-
-
       </main>
     </div>
   );
