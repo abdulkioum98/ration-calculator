@@ -1,8 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import { supabase } from '../supabaseClient';
-import { Loader2 } from 'lucide-react';
+import { Loader2, AlertCircle, Edit3 } from 'lucide-react';
+import { CowData } from './CattleInfoPage';
 
-// Interfaces matching exact Supabase schemas
 interface PriceListItem {
   id: string;
   name: string;
@@ -21,20 +21,16 @@ interface FeedNutrientItem {
   me_energy: number;
 }
 
-export default function CalculatorPage() {
+interface CalculatorPageProps {
+  cowData?: CowData | null;
+  onEditCowInfo?: () => void;
+}
+
+export default function CalculatorPage({ cowData, onEditCowInfo }: CalculatorPageProps) {
   const [loading, setLoading] = useState<boolean>(true);
   const [priceList, setPriceList] = useState<PriceListItem[]>([]);
   const [nutrientList, setNutrientList] = useState<FeedNutrientItem[]>([]);
-  
-  // State for feed quantities (Key: item.id, Value: quantity in kg)
   const [quantities, setQuantities] = useState<{ [key: string]: number }>({});
-
-  // Requirements
-  const [requirements] = useState({
-    dm: 10.0,
-    cp: 1.5,
-    energy: 90.0
-  });
 
   useEffect(() => {
     fetchCalculatorData();
@@ -43,13 +39,11 @@ export default function CalculatorPage() {
   const fetchCalculatorData = async () => {
     setLoading(true);
     try {
-      // Fetch price list (Only dairy category)
       const { data: priceData, error: priceError } = await supabase
         .from('price_list')
         .select('*')
         .ilike('category', 'dairy');
 
-      // Fetch nutrients from feed_nutrients (Only dairy category)
       const { data: nutrientData, error: nutrientError } = await supabase
         .from('feed_nutrients')
         .select('id, name, dm_percent, cp_percent, me_energy, category, feed_type')
@@ -58,8 +52,18 @@ export default function CalculatorPage() {
       if (priceError) throw priceError;
       if (nutrientError) throw nutrientError;
 
-      setPriceList(priceData || []);
-      setNutrientList(nutrientData || []);
+      const sortNourishFirst = <T extends { name: string }>(list: T[]) => {
+        return [...list].sort((a, b) => {
+          const aIsNourish = a.name.toLowerCase().includes('nourish');
+          const bIsNourish = b.name.toLowerCase().includes('nourish');
+          if (aIsNourish && !bIsNourish) return -1;
+          if (!aIsNourish && bIsNourish) return 1;
+          return 0;
+        });
+      };
+
+      setPriceList(sortNourishFirst(priceData || []));
+      setNutrientList(sortNourishFirst(nutrientData || []));
     } catch (err) {
       console.error('Error fetching calculator data:', err);
     } finally {
@@ -72,33 +76,72 @@ export default function CalculatorPage() {
     setQuantities((prev) => ({ ...prev, [id]: num }));
   };
 
-  // --- HELPER CALCULATIONS ---
+  const isItemSelected = (name: string): boolean => {
+    const item = priceList.find((p) => p.name.trim().toLowerCase() === name.trim().toLowerCase());
+    return item ? (quantities[item.id] || 0) > 0 : false;
+  };
+
+  const cowType = cowData?.cowType || 'lactating';
+  const bodyWeight = parseFloat(cowData?.weight || '0');
+  const breedType = cowData?.breedType;
+  const ageMonths = cowData?.ageMonths;
+  const nourishFeedName = cowData?.nourishFeedName;
+  
+  const milkYield = cowType === 'lactating' ? parseFloat(cowData?.milkYield || '0') : 0;
+  const ageLactationMonths = cowType === 'lactating' ? parseFloat(cowData?.ageLactation || '0') : 0;
+
+  let stageName = 'Mid Lactation';
+  let targetConcentratePct = 50;
+  let targetFodderPct = 50;
+
+  if (cowType === 'dry') {
+    stageName = 'Dry Cow';
+    targetConcentratePct = 30;
+    targetFodderPct = 70;
+  } else if (cowType === 'heifer') {
+    stageName = 'Growing Heifer';
+    targetConcentratePct = 50;
+    targetFodderPct = 50;
+  } else {
+    const days = ageLactationMonths * 30;
+    if (days <= 90) {
+      targetConcentratePct = 60;
+      targetFodderPct = 40;
+      stageName = 'Early Lactation (0-90 d)';
+    } else if (days <= 200) {
+      targetConcentratePct = 50;
+      targetFodderPct = 50;
+      stageName = 'Mid Lactation (91-200 d)';
+    } else {
+      targetConcentratePct = 30;
+      targetFodderPct = 70;
+      stageName = 'Late Lactation (201-305 d)';
+    }
+  }
 
   const getQtyByName = (name: string): number => {
     const item = priceList.find((p) => p.name.trim().toLowerCase() === name.trim().toLowerCase());
-    return item ? (quantities[item.id] || 0) : 0;
+    return item ? quantities[item.id] || 0 : 0;
   };
 
-  const getItemDMKg = (item: FeedNutrientItem): number => {
-    const qty = getQtyByName(item.name);
-    return (qty * (item.dm_percent || 0)) / 100;
-  };
+  const getItemDMKg = (item: FeedNutrientItem): number => (getQtyByName(item.name) * (item.dm_percent || 0)) / 100;
+  const getItemCPKg = (item: FeedNutrientItem): number => (getQtyByName(item.name) * (item.cp_percent || 0)) / 100;
+  const getItemEnergyMJ = (item: FeedNutrientItem): number => getQtyByName(item.name) * (item.me_energy || 0);
 
-  const getItemCPKg = (item: FeedNutrientItem): number => {
-    const dmKg = getItemDMKg(item);
-    return (dmKg * (item.cp_percent || 0)) / 100;
-  };
+  const nutrientConcentrates = nutrientList.filter((item) => item.feed_type?.toLowerCase() === 'concentrate');
+  const nutrientFodders = nutrientList.filter((item) => item.feed_type?.toLowerCase() === 'fodder');
 
-  const getItemEnergyMJ = (item: FeedNutrientItem): number => {
-    const dmKg = getItemDMKg(item);
-    return dmKg * (item.me_energy || 0);
-  };
+  const dmConcentrateTotal = nutrientConcentrates.reduce((acc, item) => acc + getItemDMKg(item), 0);
+  const dmFodderTotal = nutrientFodders.reduce((acc, item) => acc + getItemDMKg(item), 0);
+  const totalActualDM = dmConcentrateTotal + dmFodderTotal;
 
-  // --- TOTALS CALCULATIONS ---
+  const cpConcentrateTotal = nutrientConcentrates.reduce((acc, item) => acc + getItemCPKg(item), 0);
+  const cpFodderTotal = nutrientFodders.reduce((acc, item) => acc + getItemCPKg(item), 0);
+  const totalActualCP = cpConcentrateTotal + cpFodderTotal;
 
-  const totalActualDM = nutrientList.reduce((acc, item) => acc + getItemDMKg(item), 0);
-  const totalActualCP = nutrientList.reduce((acc, item) => acc + getItemCPKg(item), 0);
-  const totalActualEnergy = nutrientList.reduce((acc, item) => acc + getItemEnergyMJ(item), 0);
+  const energyConcentrateTotal = nutrientConcentrates.reduce((acc, item) => acc + getItemEnergyMJ(item), 0);
+  const energyFodderTotal = nutrientFodders.reduce((acc, item) => acc + getItemEnergyMJ(item), 0);
+  const totalActualEnergy = energyConcentrateTotal + energyFodderTotal;
 
   const costConcentrate = priceList
     .filter((p) => p.feed_type?.toLowerCase() === 'concentrate')
@@ -110,6 +153,15 @@ export default function CalculatorPage() {
 
   const totalCost = costConcentrate + costFodder;
 
+  const dmReq = (bodyWeight * 0.02) + (milkYield * 0.33);
+  const cpReq = ((bodyWeight * 1) + (milkYield * 90)) / 1000;
+  const energyReq = (bodyWeight * 0.10) + (milkYield * 6);
+
+  const actualConcentrateRatioPct = totalActualDM > 0 ? Math.round((dmConcentrateTotal / totalActualDM) * 100) : 0;
+  const actualFodderRatioPct = totalActualDM > 0 ? 100 - actualConcentrateRatioPct : 0;
+
+  const concentrateDiff = actualConcentrateRatioPct - targetConcentratePct;
+
   if (loading) {
     return (
       <div className="flex justify-center items-center h-64 text-emerald-700">
@@ -118,169 +170,282 @@ export default function CalculatorPage() {
     );
   }
 
-  // Safe Case-Insensitive Filtering for Feed Types
   const priceConcentrates = priceList.filter((item) => item.feed_type?.toLowerCase() === 'concentrate');
   const priceFodders = priceList.filter((item) => item.feed_type?.toLowerCase() === 'fodder');
 
-  const nutrientConcentrates = nutrientList.filter((item) => item.feed_type?.toLowerCase() === 'concentrate');
-  const nutrientFodders = nutrientList.filter((item) => item.feed_type?.toLowerCase() === 'fodder');
-
   return (
-    <div className="w-full p-2 sm:p-4 lg:p-6 space-y-6">
-      <h2 className="text-lg sm:text-xl lg:text-2xl font-bold text-slate-800 border-b pb-2">
-        Ration Calculator (Dairy)
-      </h2>
+    <div className="w-full space-y-4 sm:space-y-6">
+      
+      {/* BANNER */}
+      <div className="bg-emerald-50/60 rounded-xl p-3.5 sm:p-4 shadow-xs border border-emerald-200/80 flex justify-between items-center gap-3">
+        <div className="space-y-1.5 min-w-0">
+          <div className="flex items-center gap-2 flex-wrap">
+            <span className="bg-emerald-600 text-white font-bold px-2 py-0.5 rounded text-[10px] sm:text-xs uppercase tracking-wide">
+              {cowType}
+            </span>
+            <span className="text-xs sm:text-sm font-bold text-slate-800">
+              {stageName}
+            </span>
+            {breedType && (
+              <span className="bg-emerald-100 text-emerald-900 font-semibold px-2 py-0.5 rounded text-[10px] sm:text-xs border border-emerald-300">
+                {breedType}
+              </span>
+            )}
+          </div>
 
-      {/* TOP SECTION: ALWAYS SIDE BY SIDE ON MOBILE & DESKTOP */}
-      <div className="grid grid-cols-2 gap-2 sm:gap-4 lg:gap-6 items-start w-full">
+          <div className="flex items-center gap-x-3 gap-y-1 text-slate-700 text-[11px] sm:text-xs flex-wrap font-semibold">
+            <span><b>Weight:</b> {bodyWeight || 0} kg</span>
+            
+            {ageMonths && (
+              <>
+                <span className="text-slate-300">•</span>
+                <span><b>Age:</b> {ageMonths}m</span>
+              </>
+            )}
+
+            {cowType === 'lactating' && (
+              <>
+                <span className="text-slate-300">•</span>
+                <span><b>Milk:</b> {milkYield || 0} L</span>
+                <span className="text-slate-300">•</span>
+                <span><b>Lact. No:</b> {cowData?.lactationNo || '-'}</span>
+                <span className="text-slate-300">•</span>
+                <span><b>Lact. Age:</b> {ageLactationMonths || 0}m</span>
+              </>
+            )}
+
+            {nourishFeedName && (
+              <>
+                <span className="text-slate-300">•</span>
+                <span className="text-emerald-800"><b>Feed:</b> {nourishFeedName}</span>
+              </>
+            )}
+          </div>
+        </div>
+
+        {onEditCowInfo && (
+          <button
+            onClick={onEditCowInfo}
+            className="bg-white hover:bg-slate-50 text-emerald-800 border border-emerald-300 text-xs font-bold px-2.5 py-1.5 rounded-lg transition-all flex items-center gap-1.5 shrink-0 shadow-2xs"
+          >
+            <Edit3 size={13} className="text-emerald-700" />
+            <span className="hidden sm:inline">Edit Info</span>
+          </button>
+        )}
+      </div>
+
+      {/* TOP TABLES */}
+      <div className="flex flex-row gap-1.5 sm:gap-4 items-start w-full">
         
-        {/* 1. Input Quantity Table */}
-        <div className="w-full bg-white rounded-lg shadow-xs border border-slate-200 overflow-hidden">
-          <div className="bg-emerald-800 text-white p-2 sm:p-3 font-semibold text-xs sm:text-sm lg:text-base">
+        {/* Left Input Table */}
+        <div className="flex-[60] min-w-0 bg-white rounded-lg shadow-xs border border-slate-200 overflow-hidden">
+          <div className="bg-emerald-800 text-white p-2 font-semibold text-xs sm:text-sm md:text-base">
             Input Quantity
           </div>
 
           <div className="w-full">
-            <table className="w-full text-[11px] sm:text-xs lg:text-sm text-left border-collapse table-auto">
+            <table className="w-full text-[10px] sm:text-xs md:text-sm text-left border-collapse table-fixed">
               <thead>
                 <tr className="bg-slate-100 text-slate-700 font-bold">
-                  <th className="p-1.5 sm:p-2 lg:p-3 border">Feed</th>
-                  <th className="p-1.5 sm:p-2 lg:p-3 border text-center w-12 sm:w-20 lg:w-24">TK/kg</th>
-                  <th className="p-1.5 sm:p-2 lg:p-3 border text-center w-14 sm:w-24 lg:w-28">Qty (kg)</th>
+                  <th className="p-1 sm:p-2 border">Item</th>
+                  <th className="p-1 sm:p-2 border text-center w-7 sm:w-12">TK</th>
+                  <th className="p-1 sm:p-2 border text-center w-16 sm:w-24">Qty (kg)</th>
                 </tr>
               </thead>
               <tbody>
-                <tr className="bg-amber-50 font-bold text-amber-900">
-                  <td colSpan={3} className="p-1 sm:p-2 border text-[10px] sm:text-xs lg:text-sm">Concentrate (দানাদার)</td>
+                <tr className="border-b font-bold text-amber-900 text-[10px] sm:text-xs md:text-sm">
+                  <td colSpan={3} className="p-2 sm:p-2.5">Concentrate</td>
                 </tr>
-                {priceConcentrates.map((item) => (
-                  <tr key={item.id} className="hover:bg-slate-50">
-                    <td className="p-1.5 sm:p-2 lg:p-3 border font-medium text-slate-800 break-words">{item.name}</td>
-                    <td className="p-1.5 sm:p-2 lg:p-3 border text-center">{item.price_per_kg}</td>
-                    <td className="p-1 sm:p-1.5 border text-center">
-                      <input
-                        type="number"
-                        min="0"
-                        placeholder="0"
-                        value={quantities[item.id] !== undefined && quantities[item.id] !== 0 ? quantities[item.id] : ''}
-                        onChange={(e) => handleQuantityChange(item.id, e.target.value)}
-                        className="w-full border rounded p-1 text-center bg-white border-slate-300 focus:outline-none focus:ring-1 focus:ring-emerald-600 font-bold text-emerald-800 text-[11px] sm:text-xs lg:text-sm"
-                      />
-                    </td>
-                  </tr>
-                ))}
+                {priceConcentrates.map((item) => {
+                  const isSelected = (quantities[item.id] || 0) > 0;
+                  return (
+                    <tr 
+                      key={item.id} 
+                      className={`transition-colors ${isSelected ? 'bg-emerald-100/70 border-l-4 border-l-emerald-600 font-semibold' : 'hover:bg-slate-50'}`}
+                    >
+                      <td className="p-1 sm:p-2 border font-medium text-slate-800 break-words leading-tight">
+                        {item.name}
+                      </td>
+                      <td className="p-1 sm:p-2 border text-center">{item.price_per_kg}</td>
+                      <td className="p-0.5 sm:p-1 border text-center">
+                        <input
+                          type="number"
+                          min="0"
+                          placeholder="0"
+                          value={quantities[item.id] !== undefined && quantities[item.id] !== 0 ? quantities[item.id] : ''}
+                          onChange={(e) => handleQuantityChange(item.id, e.target.value)}
+                          className={`w-full border rounded p-1 text-center border-slate-300 focus:outline-none focus:ring-1 focus:ring-emerald-600 font-bold text-xs sm:text-sm md:text-base ${
+                            isSelected ? 'bg-emerald-50 text-emerald-900 border-emerald-400' : 'bg-white text-emerald-800'
+                          }`}
+                        />
+                      </td>
+                    </tr>
+                  );
+                })}
 
-                <tr className="bg-emerald-50 font-bold text-emerald-900">
-                  <td colSpan={3} className="p-1 sm:p-2 border text-[10px] sm:text-xs lg:text-sm">Fodder (কাঁচা ঘাস/খড়)</td>
+                <tr className="border-b font-bold text-emerald-900 text-[10px] sm:text-xs md:text-sm">
+                  <td colSpan={3} className="p-2 sm:p-2.5 pt-3">Fodder</td>
                 </tr>
-                {priceFodders.map((item) => (
-                  <tr key={item.id} className="hover:bg-slate-50">
-                    <td className="p-1.5 sm:p-2 lg:p-3 border font-medium text-slate-800 break-words">{item.name}</td>
-                    <td className="p-1.5 sm:p-2 lg:p-3 border text-center">{item.price_per_kg}</td>
-                    <td className="p-1 sm:p-1.5 border text-center">
-                      <input
-                        type="number"
-                        min="0"
-                        placeholder="0"
-                        value={quantities[item.id] !== undefined && quantities[item.id] !== 0 ? quantities[item.id] : ''}
-                        onChange={(e) => handleQuantityChange(item.id, e.target.value)}
-                        className="w-full border rounded p-1 text-center bg-white border-slate-300 focus:outline-none focus:ring-1 focus:ring-emerald-600 font-bold text-emerald-800 text-[11px] sm:text-xs lg:text-sm"
-                      />
-                    </td>
-                  </tr>
-                ))}
+                {priceFodders.map((item) => {
+                  const isSelected = (quantities[item.id] || 0) > 0;
+                  return (
+                    <tr 
+                      key={item.id} 
+                      className={`transition-colors ${isSelected ? 'bg-emerald-100/70 border-l-4 border-l-emerald-600 font-semibold' : 'hover:bg-slate-50'}`}
+                    >
+                      <td className="p-1 sm:p-2 border font-medium text-slate-800 break-words leading-tight">
+                        {item.name}
+                      </td>
+                      <td className="p-1 sm:p-2 border text-center">{item.price_per_kg}</td>
+                      <td className="p-0.5 sm:p-1 border text-center">
+                        <input
+                          type="number"
+                          min="0"
+                          placeholder="0"
+                          value={quantities[item.id] !== undefined && quantities[item.id] !== 0 ? quantities[item.id] : ''}
+                          onChange={(e) => handleQuantityChange(item.id, e.target.value)}
+                          className={`w-full border rounded p-1 text-center border-slate-300 focus:outline-none focus:ring-1 focus:ring-emerald-600 font-bold text-xs sm:text-sm md:text-base ${
+                            isSelected ? 'bg-emerald-50 text-emerald-900 border-emerald-400' : 'bg-white text-emerald-800'
+                          }`}
+                        />
+                      </td>
+                    </tr>
+                  );
+                })}
               </tbody>
             </table>
           </div>
+
+          {/* RATIO BREAKDOWN & UPDATED CLEAN SUGGESTION */}
+          <div className="p-2 sm:p-2.5 bg-slate-50 border-t border-slate-200 space-y-1.5 text-[10px] sm:text-xs md:text-sm">
+            <div className="font-bold text-slate-800 border-b border-slate-200 pb-0.5">
+              DM Ratio Breakdown (Conc : Fodder)
+            </div>
+            
+            <div className="flex justify-between items-center text-slate-700 flex-wrap gap-1">
+              <span>Actual:</span>
+              <span className="font-bold text-emerald-800 bg-emerald-100 px-1.5 py-0.5 rounded text-[10px] sm:text-xs md:text-sm whitespace-nowrap">
+                {actualConcentrateRatioPct} : {actualFodderRatioPct}
+              </span>
+            </div>
+
+            <div className="flex justify-between items-center text-slate-700 flex-wrap gap-1">
+              <span className="shrink-0">Target ({stageName}):</span>
+              <span className="font-semibold text-slate-700 bg-slate-200 px-1.5 py-0.5 rounded text-[10px] sm:text-xs md:text-sm whitespace-nowrap">
+                {targetConcentratePct} : {targetFodderPct}
+              </span>
+            </div>
+
+            {/* Clean Ratio Suggestion Text (Without heavy background) */}
+            {totalActualDM > 0 && Math.abs(concentrateDiff) > 2 && (
+              <div className="pt-1 flex items-center gap-1.5 text-slate-800 font-semibold text-[11px] sm:text-xs leading-snug">
+                <AlertCircle size={15} className="shrink-0 text-amber-600" />
+                <div>
+                  {concentrateDiff < 0 ? (
+                    <span>
+                      Need Concentrate <b className="text-emerald-700 text-xs sm:text-sm font-extrabold">(+{Math.abs(concentrateDiff)}%)</b> | Need Fodder <b className="text-rose-600 text-xs sm:text-sm font-extrabold">(-{Math.abs(concentrateDiff)}%)</b>
+                    </span>
+                  ) : (
+                    <span>
+                      Need Concentrate <b className="text-rose-600 text-xs sm:text-sm font-extrabold">(-{Math.abs(concentrateDiff)}%)</b> | Need Fodder <b className="text-emerald-700 text-xs sm:text-sm font-extrabold">(+{Math.abs(concentrateDiff)}%)</b>
+                    </span>
+                  )}
+                </div>
+              </div>
+            )}
+            {totalActualDM > 0 && Math.abs(concentrateDiff) <= 2 && (
+              <div className="pt-1 flex items-center gap-1.5 text-emerald-700 font-bold text-[11px] sm:text-xs">
+                <AlertCircle size={15} className="shrink-0 text-emerald-600" />
+                <span>Balanced Ratio!</span>
+              </div>
+            )}
+          </div>
         </div>
 
-        {/* 2. Calculation Summary Table */}
-        <div className="w-full bg-white rounded-lg shadow-xs border border-slate-200 overflow-hidden">
-          <div className="bg-slate-800 text-white p-2 sm:p-3 font-semibold text-xs sm:text-sm lg:text-base">
-            Summary
+        {/* Right Summary Table */}
+        <div className="flex-[40] min-w-0 bg-white rounded-lg shadow-xs border border-slate-200 overflow-hidden">
+          <div className="bg-slate-800 text-white p-2 font-semibold text-xs sm:text-sm md:text-base">
+            Calculation
           </div>
 
           <div className="w-full">
-            <table className="w-full text-[11px] sm:text-xs lg:text-sm text-left border-collapse table-auto">
+            <table className="w-full text-[9px] sm:text-xs md:text-sm text-left border-collapse table-fixed">
               <thead>
                 <tr className="bg-slate-100 text-slate-700 font-bold">
-                  <th className="p-1.5 sm:p-2 lg:p-3 border">Parameter</th>
-                  <th className="p-1.5 sm:p-2 lg:p-3 border text-center w-14 sm:w-24 lg:w-28">Qty</th>
+                  <th className="p-1 sm:p-2 border">Parameters</th>
+                  <th className="p-1 sm:p-2 border text-center w-10 sm:w-16">Qty</th>
                 </tr>
               </thead>
               <tbody>
-                {/* DM Calculation */}
-                <tr className="bg-emerald-100 font-bold text-emerald-900">
-                  <td colSpan={2} className="p-1 sm:p-2 border text-[10px] sm:text-xs lg:text-sm">DM Calculation</td>
+                {/* 1. UPDATED BACKGROUND COLOR FOR DRY MATTER HEADER */}
+                <tr className="bg-slate-200 font-extrabold text-slate-800 text-[8px] sm:text-[10px] md:text-xs border-b border-slate-300">
+                  <td colSpan={2} className="p-1 sm:p-1.5 border">Dry Matter (DM)</td>
                 </tr>
                 <tr>
-                  <td className="p-1.5 sm:p-2 lg:p-3 border text-slate-700">DM Req (Kg)</td>
-                  <td className="p-1.5 sm:p-2 lg:p-3 border text-center font-medium bg-slate-50">{requirements.dm.toFixed(2)}</td>
+                  <td className="p-1 sm:p-1.5 border text-slate-700 break-words leading-tight">DM Required (kg)</td>
+                  <td className="p-1 sm:p-1.5 border text-center font-bold bg-slate-50">{dmReq.toFixed(1)}</td>
                 </tr>
                 <tr>
-                  <td className="p-1.5 sm:p-2 lg:p-3 border text-slate-700">DM Actual (Kg)</td>
-                  <td className="p-1.5 sm:p-2 lg:p-3 border text-center font-bold bg-slate-50 text-emerald-700">{totalActualDM.toFixed(2)}</td>
+                  <td className="p-1 sm:p-1.5 border text-slate-700 break-words leading-tight">DM Actual (kg)</td>
+                  <td className="p-1 sm:p-1.5 border text-center font-bold bg-slate-50 text-emerald-700">{totalActualDM.toFixed(1)}</td>
                 </tr>
                 <tr>
-                  <td className="p-1.5 sm:p-2 lg:p-3 border text-slate-700">DM Diff (Kg)</td>
-                  <td className={`p-1.5 sm:p-2 lg:p-3 border text-center font-bold bg-slate-50 ${totalActualDM - requirements.dm < 0 ? 'text-rose-600' : 'text-emerald-700'}`}>
-                    {(totalActualDM - requirements.dm).toFixed(2)}
+                  <td className="p-1 sm:p-1.5 border text-slate-700 break-words leading-tight">DM Difference (kg)</td>
+                  <td className={`p-1 sm:p-1.5 border text-center font-bold bg-slate-50 ${totalActualDM - dmReq < 0 ? 'text-rose-600' : 'text-emerald-700'}`}>
+                    {(totalActualDM - dmReq).toFixed(1)}
                   </td>
                 </tr>
 
-                {/* CP Calculation */}
-                <tr className="bg-blue-100 font-bold text-blue-900">
-                  <td colSpan={2} className="p-1 sm:p-2 border text-[10px] sm:text-xs lg:text-sm">CP Calculation</td>
+                <tr className="bg-blue-100 font-bold text-blue-900 text-[8px] sm:text-[10px] md:text-xs">
+                  <td colSpan={2} className="p-0.5 sm:p-1 border">Crude Protein (CP)</td>
                 </tr>
                 <tr>
-                  <td className="p-1.5 sm:p-2 lg:p-3 border text-slate-700">CP Req (Kg)</td>
-                  <td className="p-1.5 sm:p-2 lg:p-3 border text-center font-medium bg-slate-50">{requirements.cp.toFixed(2)}</td>
+                  <td className="p-1 sm:p-1.5 border text-slate-700 break-words leading-tight">CP Required (kg)</td>
+                  <td className="p-1 sm:p-1.5 border text-center font-bold bg-slate-50">{cpReq.toFixed(1)}</td>
                 </tr>
                 <tr>
-                  <td className="p-1.5 sm:p-2 lg:p-3 border text-slate-700">CP Actual (Kg)</td>
-                  <td className="p-1.5 sm:p-2 lg:p-3 border text-center font-bold bg-slate-50 text-blue-700">{totalActualCP.toFixed(2)}</td>
+                  <td className="p-1 sm:p-1.5 border text-slate-700 break-words leading-tight">CP Actual (kg)</td>
+                  <td className="p-1 sm:p-1.5 border text-center font-bold bg-slate-50 text-blue-700">{totalActualCP.toFixed(1)}</td>
                 </tr>
                 <tr>
-                  <td className="p-1.5 sm:p-2 lg:p-3 border text-slate-700">CP Diff (Kg)</td>
-                  <td className={`p-1.5 sm:p-2 lg:p-3 border text-center font-bold bg-slate-50 ${totalActualCP - requirements.cp < 0 ? 'text-rose-600' : 'text-emerald-700'}`}>
-                    {(totalActualCP - requirements.cp).toFixed(2)}
+                  <td className="p-1 sm:p-1.5 border text-slate-700 break-words leading-tight">CP Difference (kg)</td>
+                  <td className={`p-1 sm:p-1.5 border text-center font-bold bg-slate-50 ${totalActualCP - cpReq < 0 ? 'text-rose-600' : 'text-emerald-700'}`}>
+                    {(totalActualCP - cpReq).toFixed(1)}
                   </td>
                 </tr>
 
-                {/* Energy Calculation */}
-                <tr className="bg-purple-100 font-bold text-purple-900">
-                  <td colSpan={2} className="p-1 sm:p-2 border text-[10px] sm:text-xs lg:text-sm">Energy Calculation</td>
+                <tr className="bg-purple-100 font-bold text-purple-900 text-[8px] sm:text-[10px] md:text-xs">
+                  <td colSpan={2} className="p-0.5 sm:p-1 border">Energy (MJ)</td>
                 </tr>
                 <tr>
-                  <td className="p-1.5 sm:p-2 lg:p-3 border text-slate-700">Energy Req (MJ)</td>
-                  <td className="p-1.5 sm:p-2 lg:p-3 border text-center font-medium bg-slate-50">{requirements.energy.toFixed(2)}</td>
+                  <td className="p-1 sm:p-1.5 border text-slate-700 break-words leading-tight">Energy Required (MJ)</td>
+                  <td className="p-1 sm:p-1.5 border text-center font-bold bg-slate-50">{energyReq.toFixed(1)}</td>
                 </tr>
                 <tr>
-                  <td className="p-1.5 sm:p-2 lg:p-3 border text-slate-700">Energy Actual (MJ)</td>
-                  <td className="p-1.5 sm:p-2 lg:p-3 border text-center font-bold bg-slate-50 text-purple-700">{totalActualEnergy.toFixed(2)}</td>
+                  <td className="p-1 sm:p-1.5 border text-slate-700 break-words leading-tight">Energy Actual (MJ)</td>
+                  <td className="p-1 sm:p-1.5 border text-center font-bold bg-slate-50 text-purple-700">{totalActualEnergy.toFixed(1)}</td>
                 </tr>
                 <tr>
-                  <td className="p-1.5 sm:p-2 lg:p-3 border text-slate-700">Energy Diff (MJ)</td>
-                  <td className={`p-1.5 sm:p-2 lg:p-3 border text-center font-bold bg-slate-50 ${totalActualEnergy - requirements.energy < 0 ? 'text-rose-600' : 'text-emerald-700'}`}>
-                    {(totalActualEnergy - requirements.energy).toFixed(2)}
+                  <td className="p-1 sm:p-1.5 border text-slate-700 break-words leading-tight">Energy Difference (MJ)</td>
+                  <td className={`p-1 sm:p-1.5 border text-center font-bold bg-slate-50 ${totalActualEnergy - energyReq < 0 ? 'text-rose-600' : 'text-emerald-700'}`}>
+                    {(totalActualEnergy - energyReq).toFixed(1)}
                   </td>
                 </tr>
 
-                {/* Cost Calculation */}
-                <tr className="bg-amber-100 font-bold text-amber-900">
-                  <td colSpan={2} className="p-1 sm:p-2 border text-[10px] sm:text-xs lg:text-sm">Cost Calculation</td>
+                <tr className="bg-amber-100 font-bold text-amber-900 text-[8px] sm:text-[10px] md:text-xs">
+                  <td colSpan={2} className="p-0.5 sm:p-1 border">Cost Breakdown</td>
                 </tr>
                 <tr>
-                  <td className="p-1.5 sm:p-2 lg:p-3 border text-slate-700">Concentrate Cost</td>
-                  <td className="p-1.5 sm:p-2 lg:p-3 border text-center font-medium bg-slate-50">৳{costConcentrate.toFixed(2)}</td>
+                  <td className="p-1 sm:p-1.5 border text-slate-700 break-words leading-tight">Concentrate Cost</td>
+                  <td className="p-1 sm:p-1.5 border text-center font-medium bg-slate-50">৳{costConcentrate.toFixed(0)}</td>
                 </tr>
                 <tr>
-                  <td className="p-1.5 sm:p-2 lg:p-3 border text-slate-700">Fodder Cost</td>
-                  <td className="p-1.5 sm:p-2 lg:p-3 border text-center font-medium bg-slate-50">৳{costFodder.toFixed(2)}</td>
+                  <td className="p-1 sm:p-1.5 border text-slate-700 break-words leading-tight">Fodder Cost</td>
+                  <td className="p-1 sm:p-1.5 border text-center font-medium bg-slate-50">৳{costFodder.toFixed(0)}</td>
                 </tr>
                 <tr className="font-bold bg-slate-100">
-                  <td className="p-1.5 sm:p-2 lg:p-3 border text-slate-900">Total Cost</td>
-                  <td className="p-1.5 sm:p-2 lg:p-3 border text-center font-bold bg-amber-200 text-amber-900">৳{totalCost.toFixed(2)}</td>
+                  <td className="p-1 sm:p-1.5 border text-slate-900 break-words leading-tight">Total Cost</td>
+                  <td className="p-1 sm:p-1.5 border text-center font-bold bg-amber-200 text-amber-900">৳{totalCost.toFixed(0)}</td>
                 </tr>
               </tbody>
             </table>
@@ -289,51 +454,77 @@ export default function CalculatorPage() {
 
       </div>
 
-      {/* BOTTOM SECTION: NUTRIENT TABLES */}
+      {/* LOWER TABLES - FIXED FULL ROW HIGHLIGHT ON SELECTION */}
       <div className="space-y-6 pt-2 w-full">
         
         {/* DM Table */}
         <div className="w-full bg-white rounded-lg shadow-xs border border-slate-200 overflow-hidden">
-          <div className="bg-emerald-700 text-white p-2.5 sm:p-3 font-semibold text-xs sm:text-sm lg:text-base">
+          <div className="bg-emerald-700 text-white p-2 sm:p-2.5 font-semibold text-xs sm:text-sm md:text-base">
             DM of Feed
           </div>
           <div className="w-full">
-            <table className="w-full text-xs sm:text-sm text-left border-collapse table-auto">
+            <table className="w-full text-xs md:text-sm text-left border-collapse table-auto">
               <thead>
                 <tr className="bg-slate-100 text-slate-700 font-bold">
-                  <th className="p-2 sm:p-3 border">Feed Ingredients</th>
-                  <th className="p-2 sm:p-3 border text-center w-24 sm:w-36">DM (%)</th>
-                  <th className="p-2 sm:p-3 border text-center w-28 sm:w-40">DM Amount (kg)</th>
+                  <th className="p-2 border">Feed Ingredients</th>
+                  <th className="p-2 border text-center w-16 sm:w-24">DM (%)</th>
+                  <th className="p-2 border text-center w-20 sm:w-28">Amount (kg)</th>
                 </tr>
               </thead>
               <tbody>
-                <tr className="bg-amber-50 font-bold text-amber-900">
-                  <td colSpan={3} className="p-1.5 sm:p-2 border text-xs sm:text-sm">Concentrate</td>
+                <tr className="font-extrabold text-amber-900 text-xs sm:text-sm">
+                  <td colSpan={3} className="p-2 bg-slate-50">Concentrate</td>
                 </tr>
-                {nutrientConcentrates.map((item) => (
-                  <tr key={item.id} className="hover:bg-slate-50">
-                    <td className="p-2 sm:p-3 border font-medium text-slate-800 break-words">{item.name}</td>
-                    <td className="p-2 sm:p-3 border text-center">{item.dm_percent}%</td>
-                    <td className="p-2 sm:p-3 border text-center font-bold text-emerald-800 bg-slate-50">
-                      {getItemDMKg(item).toFixed(2)}
-                    </td>
-                  </tr>
-                ))}
-                <tr className="bg-emerald-50 font-bold text-emerald-900">
-                  <td colSpan={3} className="p-1.5 sm:p-2 border text-xs sm:text-sm">Fodder</td>
+                {nutrientConcentrates.map((item) => {
+                  const selected = isItemSelected(item.name);
+                  const selectedCellClass = selected ? 'bg-emerald-100/80 font-semibold text-emerald-950' : 'hover:bg-slate-50';
+                  return (
+                    <tr key={item.id}>
+                      <td className={`p-2 border font-medium ${selectedCellClass} ${selected ? 'border-l-4 border-l-emerald-600' : ''}`}>
+                        {item.name}
+                      </td>
+                      <td className={`p-2 border text-center ${selectedCellClass}`}>
+                        {item.dm_percent}%
+                      </td>
+                      <td className={`p-2 border text-center font-bold ${selected ? 'bg-emerald-200/80 text-emerald-950' : 'bg-slate-50 text-emerald-800'}`}>
+                        {getItemDMKg(item).toFixed(2)}
+                      </td>
+                    </tr>
+                  );
+                })}
+                <tr className="font-bold text-slate-800">
+                  <td colSpan={2} className="p-2 border text-right">Total Concentrate DM:</td>
+                  <td className="p-2 border text-center font-bold">{dmConcentrateTotal.toFixed(2)}</td>
                 </tr>
-                {nutrientFodders.map((item) => (
-                  <tr key={item.id} className="hover:bg-slate-50">
-                    <td className="p-2 sm:p-3 border font-medium text-slate-800 break-words">{item.name}</td>
-                    <td className="p-2 sm:p-3 border text-center">{item.dm_percent}%</td>
-                    <td className="p-2 sm:p-3 border text-center font-bold text-emerald-800 bg-slate-50">
-                      {getItemDMKg(item).toFixed(2)}
-                    </td>
-                  </tr>
-                ))}
-                <tr className="bg-emerald-100 font-bold text-emerald-900">
-                  <td colSpan={2} className="p-2 sm:p-3 border text-right">Total DM (Kg):</td>
-                  <td className="p-2 sm:p-3 border text-center font-black bg-emerald-200">{totalActualDM.toFixed(2)}</td>
+
+                <tr className="font-extrabold text-emerald-900 text-xs sm:text-sm">
+                  <td colSpan={3} className="p-2 pt-3 bg-slate-50">Fodder</td>
+                </tr>
+                {nutrientFodders.map((item) => {
+                  const selected = isItemSelected(item.name);
+                  const selectedCellClass = selected ? 'bg-emerald-100/80 font-semibold text-emerald-950' : 'hover:bg-slate-50';
+                  return (
+                    <tr key={item.id}>
+                      <td className={`p-2 border font-medium ${selectedCellClass} ${selected ? 'border-l-4 border-l-emerald-600' : ''}`}>
+                        {item.name}
+                      </td>
+                      <td className={`p-2 border text-center ${selectedCellClass}`}>
+                        {item.dm_percent}%
+                      </td>
+                      <td className={`p-2 border text-center font-bold ${selected ? 'bg-emerald-200/80 text-emerald-950' : 'bg-slate-50 text-emerald-800'}`}>
+                        {getItemDMKg(item).toFixed(2)}
+                      </td>
+                    </tr>
+                  );
+                })}
+                <tr className="font-bold text-slate-800">
+                  <td colSpan={2} className="p-2 border text-right">Total Fodder DM:</td>
+                  <td className="p-2 border text-center font-bold">{dmFodderTotal.toFixed(2)}</td>
+                </tr>
+
+                <tr className="font-extrabold text-slate-900 border-t-2 border-slate-300">
+                  <td colSpan={2} className="p-2 border text-right">Total DM (Kg):</td>
+                  <td className="p-2 border text-center font-black text-emerald-800">{totalActualDM.toFixed(2)}</td>
                 </tr>
               </tbody>
             </table>
@@ -342,46 +533,72 @@ export default function CalculatorPage() {
 
         {/* CP Table */}
         <div className="w-full bg-white rounded-lg shadow-xs border border-slate-200 overflow-hidden">
-          <div className="bg-blue-700 text-white p-2.5 sm:p-3 font-semibold text-xs sm:text-sm lg:text-base">
+          <div className="bg-blue-700 text-white p-2 sm:p-2.5 font-semibold text-xs sm:text-sm md:text-base">
             CP of Feed
           </div>
           <div className="w-full">
-            <table className="w-full text-xs sm:text-sm text-left border-collapse table-auto">
+            <table className="w-full text-xs md:text-sm text-left border-collapse table-auto">
               <thead>
                 <tr className="bg-slate-100 text-slate-700 font-bold">
-                  <th className="p-2 sm:p-3 border">Feed Ingredients</th>
-                  <th className="p-2 sm:p-3 border text-center w-24 sm:w-36">CP (%)</th>
-                  <th className="p-2 sm:p-3 border text-center w-28 sm:w-40">CP Amount (kg)</th>
+                  <th className="p-2 border">Feed Ingredients</th>
+                  <th className="p-2 border text-center w-16 sm:w-24">CP (%)</th>
+                  <th className="p-2 border text-center w-20 sm:w-28">Amount (kg)</th>
                 </tr>
               </thead>
               <tbody>
-                <tr className="bg-amber-50 font-bold text-amber-900">
-                  <td colSpan={3} className="p-1.5 sm:p-2 border text-xs sm:text-sm">Concentrate</td>
+                <tr className="font-extrabold text-amber-900 text-xs sm:text-sm">
+                  <td colSpan={3} className="p-2 bg-slate-50">Concentrate</td>
                 </tr>
-                {nutrientConcentrates.map((item) => (
-                  <tr key={item.id} className="hover:bg-slate-50">
-                    <td className="p-2 sm:p-3 border font-medium text-slate-800 break-words">{item.name}</td>
-                    <td className="p-2 sm:p-3 border text-center">{item.cp_percent}%</td>
-                    <td className="p-2 sm:p-3 border text-center font-bold text-blue-800 bg-slate-50">
-                      {getItemCPKg(item).toFixed(2)}
-                    </td>
-                  </tr>
-                ))}
-                <tr className="bg-emerald-50 font-bold text-emerald-900">
-                  <td colSpan={3} className="p-1.5 sm:p-2 border text-xs sm:text-sm">Fodder</td>
+                {nutrientConcentrates.map((item) => {
+                  const selected = isItemSelected(item.name);
+                  const selectedCellClass = selected ? 'bg-emerald-100/80 font-semibold text-emerald-950' : 'hover:bg-slate-50';
+                  return (
+                    <tr key={item.id}>
+                      <td className={`p-2 border font-medium ${selectedCellClass} ${selected ? 'border-l-4 border-l-emerald-600' : ''}`}>
+                        {item.name}
+                      </td>
+                      <td className={`p-2 border text-center ${selectedCellClass}`}>
+                        {item.cp_percent}%
+                      </td>
+                      <td className={`p-2 border text-center font-bold ${selected ? 'bg-emerald-200/80 text-emerald-950' : 'bg-slate-50 text-blue-800'}`}>
+                        {getItemCPKg(item).toFixed(2)}
+                      </td>
+                    </tr>
+                  );
+                })}
+                <tr className="font-bold text-slate-800">
+                  <td colSpan={2} className="p-2 border text-right">Total Concentrate CP:</td>
+                  <td className="p-2 border text-center font-bold">{cpConcentrateTotal.toFixed(2)}</td>
                 </tr>
-                {nutrientFodders.map((item) => (
-                  <tr key={item.id} className="hover:bg-slate-50">
-                    <td className="p-2 sm:p-3 border font-medium text-slate-800 break-words">{item.name}</td>
-                    <td className="p-2 sm:p-3 border text-center">{item.cp_percent}%</td>
-                    <td className="p-2 sm:p-3 border text-center font-bold text-blue-800 bg-slate-50">
-                      {getItemCPKg(item).toFixed(2)}
-                    </td>
-                  </tr>
-                ))}
-                <tr className="bg-blue-100 font-bold text-blue-900">
-                  <td colSpan={2} className="p-2 sm:p-3 border text-right">Total CP (Kg):</td>
-                  <td className="p-2 sm:p-3 border text-center font-black bg-blue-200">{totalActualCP.toFixed(2)}</td>
+
+                <tr className="font-extrabold text-emerald-900 text-xs sm:text-sm">
+                  <td colSpan={3} className="p-2 pt-3 bg-slate-50">Fodder</td>
+                </tr>
+                {nutrientFodders.map((item) => {
+                  const selected = isItemSelected(item.name);
+                  const selectedCellClass = selected ? 'bg-emerald-100/80 font-semibold text-emerald-950' : 'hover:bg-slate-50';
+                  return (
+                    <tr key={item.id}>
+                      <td className={`p-2 border font-medium ${selectedCellClass} ${selected ? 'border-l-4 border-l-emerald-600' : ''}`}>
+                        {item.name}
+                      </td>
+                      <td className={`p-2 border text-center ${selectedCellClass}`}>
+                        {item.cp_percent}%
+                      </td>
+                      <td className={`p-2 border text-center font-bold ${selected ? 'bg-emerald-200/80 text-emerald-950' : 'bg-slate-50 text-blue-800'}`}>
+                        {getItemCPKg(item).toFixed(2)}
+                      </td>
+                    </tr>
+                  );
+                })}
+                <tr className="font-bold text-slate-800">
+                  <td colSpan={2} className="p-2 border text-right">Total Fodder CP:</td>
+                  <td className="p-2 border text-center font-bold">{cpFodderTotal.toFixed(2)}</td>
+                </tr>
+
+                <tr className="font-extrabold text-slate-900 border-t-2 border-slate-300">
+                  <td colSpan={2} className="p-2 border text-right">Total CP (Kg):</td>
+                  <td className="p-2 border text-center font-black text-blue-800">{totalActualCP.toFixed(2)}</td>
                 </tr>
               </tbody>
             </table>
@@ -390,46 +607,72 @@ export default function CalculatorPage() {
 
         {/* Energy Table */}
         <div className="w-full bg-white rounded-lg shadow-xs border border-slate-200 overflow-hidden">
-          <div className="bg-purple-700 text-white p-2.5 sm:p-3 font-semibold text-xs sm:text-sm lg:text-base">
+          <div className="bg-purple-700 text-white p-2 sm:p-2.5 font-semibold text-xs sm:text-sm md:text-base">
             Energy of Feed
           </div>
           <div className="w-full">
-            <table className="w-full text-xs sm:text-sm text-left border-collapse table-auto">
+            <table className="w-full text-xs md:text-sm text-left border-collapse table-auto">
               <thead>
                 <tr className="bg-slate-100 text-slate-700 font-bold">
-                  <th className="p-2 sm:p-3 border">Feed Ingredients</th>
-                  <th className="p-2 sm:p-3 border text-center w-28 sm:w-44">Energy (MJ/kg DM)</th>
-                  <th className="p-2 sm:p-3 border text-center w-28 sm:w-40">Energy Amount (MJ)</th>
+                  <th className="p-2 border">Feed Ingredients</th>
+                  <th className="p-2 border text-center w-16 sm:w-28">MJ/kg</th>
+                  <th className="p-2 border text-center w-20 sm:w-28">Amount (MJ)</th>
                 </tr>
               </thead>
               <tbody>
-                <tr className="bg-amber-50 font-bold text-amber-900">
-                  <td colSpan={3} className="p-1.5 sm:p-2 border text-xs sm:text-sm">Concentrate</td>
+                <tr className="font-extrabold text-amber-900 text-xs sm:text-sm">
+                  <td colSpan={3} className="p-2 bg-slate-50">Concentrate</td>
                 </tr>
-                {nutrientConcentrates.map((item) => (
-                  <tr key={item.id} className="hover:bg-slate-50">
-                    <td className="p-2 sm:p-3 border font-medium text-slate-800 break-words">{item.name}</td>
-                    <td className="p-2 sm:p-3 border text-center">{item.me_energy}</td>
-                    <td className="p-2 sm:p-3 border text-center font-bold text-purple-800 bg-slate-50">
-                      {getItemEnergyMJ(item).toFixed(2)}
-                    </td>
-                  </tr>
-                ))}
-                <tr className="bg-emerald-50 font-bold text-emerald-900">
-                  <td colSpan={3} className="p-1.5 sm:p-2 border text-xs sm:text-sm">Fodder</td>
+                {nutrientConcentrates.map((item) => {
+                  const selected = isItemSelected(item.name);
+                  const selectedCellClass = selected ? 'bg-emerald-100/80 font-semibold text-emerald-950' : 'hover:bg-slate-50';
+                  return (
+                    <tr key={item.id}>
+                      <td className={`p-2 border font-medium ${selectedCellClass} ${selected ? 'border-l-4 border-l-emerald-600' : ''}`}>
+                        {item.name}
+                      </td>
+                      <td className={`p-2 border text-center ${selectedCellClass}`}>
+                        {item.me_energy}
+                      </td>
+                      <td className={`p-2 border text-center font-bold ${selected ? 'bg-emerald-200/80 text-emerald-950' : 'bg-slate-50 text-purple-800'}`}>
+                        {getItemEnergyMJ(item).toFixed(2)}
+                      </td>
+                    </tr>
+                  );
+                })}
+                <tr className="font-bold text-slate-800">
+                  <td colSpan={2} className="p-2 border text-right">Total Concentrate Energy:</td>
+                  <td className="p-2 border text-center font-bold">{energyConcentrateTotal.toFixed(2)}</td>
                 </tr>
-                {nutrientFodders.map((item) => (
-                  <tr key={item.id} className="hover:bg-slate-50">
-                    <td className="p-2 sm:p-3 border font-medium text-slate-800 break-words">{item.name}</td>
-                    <td className="p-2 sm:p-3 border text-center">{item.me_energy}</td>
-                    <td className="p-2 sm:p-3 border text-center font-bold text-purple-800 bg-slate-50">
-                      {getItemEnergyMJ(item).toFixed(2)}
-                    </td>
-                  </tr>
-                ))}
-                <tr className="bg-purple-100 font-bold text-purple-900">
-                  <td colSpan={2} className="p-2 sm:p-3 border text-right">Total Energy (MJ):</td>
-                  <td className="p-2 sm:p-3 border text-center font-black bg-purple-200">{totalActualEnergy.toFixed(2)}</td>
+
+                <tr className="font-extrabold text-emerald-900 text-xs sm:text-sm">
+                  <td colSpan={3} className="p-2 pt-3 bg-slate-50">Fodder</td>
+                </tr>
+                {nutrientFodders.map((item) => {
+                  const selected = isItemSelected(item.name);
+                  const selectedCellClass = selected ? 'bg-emerald-100/80 font-semibold text-emerald-950' : 'hover:bg-slate-50';
+                  return (
+                    <tr key={item.id}>
+                      <td className={`p-2 border font-medium ${selectedCellClass} ${selected ? 'border-l-4 border-l-emerald-600' : ''}`}>
+                        {item.name}
+                      </td>
+                      <td className={`p-2 border text-center ${selectedCellClass}`}>
+                        {item.me_energy}
+                      </td>
+                      <td className={`p-2 border text-center font-bold ${selected ? 'bg-emerald-200/80 text-emerald-950' : 'bg-slate-50 text-purple-800'}`}>
+                        {getItemEnergyMJ(item).toFixed(2)}
+                      </td>
+                    </tr>
+                  );
+                })}
+                <tr className="font-bold text-slate-800">
+                  <td colSpan={2} className="p-2 border text-right">Total Fodder Energy:</td>
+                  <td className="p-2 border text-center font-bold">{energyFodderTotal.toFixed(2)}</td>
+                </tr>
+
+                <tr className="font-extrabold text-slate-900 border-t-2 border-slate-300">
+                  <td colSpan={2} className="p-2 border text-right">Total Energy (MJ):</td>
+                  <td className="p-2 border text-center font-black text-purple-800">{totalActualEnergy.toFixed(2)}</td>
                 </tr>
               </tbody>
             </table>

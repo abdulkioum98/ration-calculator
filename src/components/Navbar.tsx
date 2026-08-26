@@ -31,16 +31,6 @@ export default function Navbar({ onOpenSidebar, onGoHome, onGoCalculator, hasCow
       </div>
       
       <div className="flex items-center space-x-2">
-        {hasCowData && (
-          <button 
-            onClick={onGoCalculator} 
-            className="bg-emerald-800 hover:bg-emerald-900 text-white px-2.5 py-1.5 rounded-lg text-xs font-semibold flex items-center space-x-1 transition shadow-xs"
-            title="Go to Calculator"
-          >
-            <Calculator size={16} />
-            <span>Calc</span>
-          </button>
-        )}
         
         <button 
           onClick={onGoHome} 
