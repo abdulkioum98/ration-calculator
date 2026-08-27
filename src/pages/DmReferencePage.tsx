@@ -6,7 +6,7 @@ export interface DmReferenceItem {
   id: string;
   stage_key: string;
   stage_name: string;
-  target_group: 'dairy' | 'heifer';
+  target_group: 'dairy' | 'heifer' | 'fattening';
   concentrate_ratio: number;
   fodder_ratio: number;
   min_days?: number | null;
@@ -34,7 +34,8 @@ export default function DmReferencePage({ onBack }: DmReferencePageProps) {
       .from('dm_references')
       .select('*')
       .order('target_group', { ascending: true })
-      .order('min_days', { ascending: true, nullsFirst: false });
+      .order('min_days', { ascending: true, nullsFirst: false })
+      .order('min_months', { ascending: true, nullsFirst: false });
 
     if (error) {
       console.error('Error fetching DM references:', error);
@@ -85,6 +86,70 @@ export default function DmReferencePage({ onBack }: DmReferencePageProps) {
 
   const dairyItems = references.filter((r) => r.target_group === 'dairy');
   const heiferItems = references.filter((r) => r.target_group === 'heifer');
+  const fatteningItems = references.filter((r) => r.target_group === 'fattening');
+
+  const renderReferenceList = (items: DmReferenceItem[]) => (
+    <div className="divide-y divide-slate-100">
+      {items.map((item) => (
+        <div key={item.id} className="p-3 flex items-center justify-between text-xs hover:bg-slate-50">
+          <div className="space-y-0.5 pr-2">
+            <p className="font-semibold text-slate-800">{item.stage_name}</p>
+            <p className="text-[10px] text-slate-400">
+              {item.min_days !== undefined && item.min_days !== null
+                ? `Days: ${item.min_days} - ${item.max_days} d`
+                : item.min_months !== undefined && item.min_months !== null
+                ? `Age: ${item.min_months}${item.max_months ? ` - ${item.max_months}` : '+'} Months`
+                : ''}
+            </p>
+          </div>
+
+          {editingId === item.id ? (
+            <div className="flex items-center space-x-1.5">
+              <div className="flex items-center space-x-1 bg-slate-100 p-1 rounded-lg border">
+                <input
+                  type="number"
+                  value={concInput}
+                  onChange={(e) => setConcInput(e.target.value)}
+                  className="w-8 text-center bg-white border rounded text-xs py-0.5 font-bold text-emerald-700"
+                />
+                <span className="text-slate-400 font-bold">:</span>
+                <input
+                  type="number"
+                  value={fodderInput}
+                  onChange={(e) => setFodderInput(e.target.value)}
+                  className="w-8 text-center bg-white border rounded text-xs py-0.5 font-bold text-emerald-700"
+                />
+              </div>
+              <button
+                onClick={() => handleSaveUpdate(item.id)}
+                className="p-1 text-emerald-700 hover:bg-emerald-50 rounded"
+              >
+                <Check size={15} />
+              </button>
+              <button
+                onClick={() => setEditingId(null)}
+                className="p-1 text-slate-400 hover:bg-slate-100 rounded"
+              >
+                <X size={15} />
+              </button>
+            </div>
+          ) : (
+            <div className="flex items-center space-x-3">
+              <span className="bg-emerald-50 text-emerald-800 font-bold px-2.5 py-1 rounded-md border border-emerald-200/50">
+                {item.concentrate_ratio} : {item.fodder_ratio}
+              </span>
+              <button
+                onClick={() => handleEditClick(item)}
+                className="text-slate-400 hover:text-emerald-700 p-1"
+              >
+                <Edit2 size={13} />
+              </button>
+            </div>
+          )}
+        </div>
+      ))}
+    </div>
+  );
 
   return (
     <div className="bg-slate-50 min-h-[85vh] p-3 sm:p-4 rounded-2xl shadow-xs border border-slate-200 space-y-4 max-w-md mx-auto">
@@ -120,125 +185,23 @@ export default function DmReferencePage({ onBack }: DmReferencePageProps) {
             <div className="bg-emerald-800 text-white px-3.5 py-2 text-xs font-bold uppercase tracking-wide">
               Dairy Cow Stages (Lactation Days)
             </div>
-            <div className="divide-y divide-slate-100">
-              {dairyItems.map((item) => (
-                <div key={item.id} className="p-3 flex items-center justify-between text-xs hover:bg-slate-50">
-                  <div className="space-y-0.5 pr-2">
-                    <p className="font-semibold text-slate-800">{item.stage_name}</p>
-                    <p className="text-[10px] text-slate-400">
-                      Days: {item.min_days} - {item.max_days} d
-                    </p>
-                  </div>
-
-                  {editingId === item.id ? (
-                    <div className="flex items-center space-x-1.5">
-                      <div className="flex items-center space-x-1 bg-slate-100 p-1 rounded-lg border">
-                        <input
-                          type="number"
-                          value={concInput}
-                          onChange={(e) => setConcInput(e.target.value)}
-                          className="w-8 text-center bg-white border rounded text-xs py-0.5 font-bold text-emerald-700"
-                        />
-                        <span className="text-slate-400 font-bold">:</span>
-                        <input
-                          type="number"
-                          value={fodderInput}
-                          onChange={(e) => setFodderInput(e.target.value)}
-                          className="w-8 text-center bg-white border rounded text-xs py-0.5 font-bold text-emerald-700"
-                        />
-                      </div>
-                      <button
-                        onClick={() => handleSaveUpdate(item.id)}
-                        className="p-1 text-emerald-700 hover:bg-emerald-50 rounded"
-                      >
-                        <Check size={15} />
-                      </button>
-                      <button
-                        onClick={() => setEditingId(null)}
-                        className="p-1 text-slate-400 hover:bg-slate-100 rounded"
-                      >
-                        <X size={15} />
-                      </button>
-                    </div>
-                  ) : (
-                    <div className="flex items-center space-x-3">
-                      <span className="bg-emerald-50 text-emerald-800 font-bold px-2.5 py-1 rounded-md border border-emerald-200/50">
-                        {item.concentrate_ratio} : {item.fodder_ratio}
-                      </span>
-                      <button
-                        onClick={() => handleEditClick(item)}
-                        className="text-slate-400 hover:text-emerald-700 p-1"
-                      >
-                        <Edit2 size={13} />
-                      </button>
-                    </div>
-                  )}
-                </div>
-              ))}
-            </div>
+            {renderReferenceList(dairyItems)}
           </div>
 
           {/* Heifer Section */}
           <div className="bg-white rounded-xl border border-slate-200 overflow-hidden shadow-2xs">
             <div className="bg-slate-800 text-white px-3.5 py-2 text-xs font-bold uppercase tracking-wide">
-              Heifer
+              Heifer Stages
             </div>
-            <div className="divide-y divide-slate-100">
-              {heiferItems.map((item) => (
-                <div key={item.id} className="p-3 flex items-center justify-between text-xs hover:bg-slate-50">
-                  <div className="space-y-0.5 pr-2">
-                    <p className="font-semibold text-slate-800">{item.stage_name}</p>
-                    <p className="text-[10px] text-slate-400">
-                      Age: {item.min_months} - {item.max_months} Months
-                    </p>
-                  </div>
+            {renderReferenceList(heiferItems)}
+          </div>
 
-                  {editingId === item.id ? (
-                    <div className="flex items-center space-x-1.5">
-                      <div className="flex items-center space-x-1 bg-slate-100 p-1 rounded-lg border">
-                        <input
-                          type="number"
-                          value={concInput}
-                          onChange={(e) => setConcInput(e.target.value)}
-                          className="w-8 text-center bg-white border rounded text-xs py-0.5 font-bold text-emerald-700"
-                        />
-                        <span className="text-slate-400 font-bold">:</span>
-                        <input
-                          type="number"
-                          value={fodderInput}
-                          onChange={(e) => setFodderInput(e.target.value)}
-                          className="w-8 text-center bg-white border rounded text-xs py-0.5 font-bold text-emerald-700"
-                        />
-                      </div>
-                      <button
-                        onClick={() => handleSaveUpdate(item.id)}
-                        className="p-1 text-emerald-700 hover:bg-emerald-50 rounded"
-                      >
-                        <Check size={15} />
-                      </button>
-                      <button
-                        onClick={() => setEditingId(null)}
-                        className="p-1 text-slate-400 hover:bg-slate-100 rounded"
-                      >
-                        <X size={15} />
-                      </button>
-                    </div>
-                  ) : (
-                    <div className="flex items-center space-x-3">
-                      <span className="bg-emerald-50 text-emerald-800 font-bold px-2.5 py-1 rounded-md border border-emerald-200/50">
-                        {item.concentrate_ratio} : {item.fodder_ratio}
-                      </span>
-                      <button
-                        onClick={() => handleEditClick(item)}
-                        className="text-slate-400 hover:text-emerald-700 p-1"
-                      >
-                        <Edit2 size={13} />
-                      </button>
-                    </div>
-                  )}
-                </div>
-              ))}
+          {/* Fattening Section */}
+          <div className="bg-white rounded-xl border border-slate-200 overflow-hidden shadow-2xs">
+            <div className="bg-amber-800 text-white px-3.5 py-2 text-xs font-bold uppercase tracking-wide">
+              Fattening Animals
             </div>
+            {renderReferenceList(fatteningItems)}
           </div>
         </div>
       )}

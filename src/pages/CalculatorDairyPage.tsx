@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { supabase } from '../supabaseClient';
-import { Loader2, AlertCircle, Edit3 } from 'lucide-react';
+import { Loader2, AlertCircle, Edit3, CheckCircle2 } from 'lucide-react';
 import { CowData } from './CattleInfoPage';
 
 interface PriceListItem {
@@ -162,6 +162,22 @@ export default function CalculatorPage({ cowData, onEditCowInfo }: CalculatorPag
 
   const concentrateDiff = actualConcentrateRatioPct - targetConcentratePct;
 
+  // Differences Calculations
+  const dmDiff = totalActualDM - dmReq;
+  const cpDiff = totalActualCP - cpReq;
+  const energyDiff = totalActualEnergy - energyReq;
+
+  // Percentage Deviation Helper (10% threshold)
+  const dmDevPct = dmReq > 0 ? Math.abs(dmDiff / dmReq) : 0;
+  const cpDevPct = cpReq > 0 ? Math.abs(cpDiff / cpReq) : 0;
+  const energyDevPct = energyReq > 0 ? Math.abs(energyDiff / energyReq) : 0;
+
+  // Check all parameters that need adjustment (> 10% deviation)
+  const offParameters: { name: string; key: 'dm' | 'cp' | 'energy' }[] = [];
+  if (dmDevPct > 0.10) offParameters.push({ name: 'DM', key: 'dm' });
+  if (cpDevPct > 0.10) offParameters.push({ name: 'CP', key: 'cp' });
+  if (energyDevPct > 0.10) offParameters.push({ name: 'Energy', key: 'energy' });
+
   if (loading) {
     return (
       <div className="flex justify-center items-center h-64 text-emerald-700">
@@ -248,8 +264,8 @@ export default function CalculatorPage({ cowData, onEditCowInfo }: CalculatorPag
               <thead>
                 <tr className="bg-slate-100 text-slate-700 font-bold">
                   <th className="p-1 sm:p-2 border">Item</th>
-                  <th className="p-1 sm:p-2 border text-center w-7 sm:w-12">TK</th>
-                  <th className="p-1 sm:p-2 border text-center w-16 sm:w-24">Qty (kg)</th>
+                  <th className="p-1 sm:p-2 border text-center w-8 sm:w-12">TK</th>
+                  <th className="p-1 sm:p-2 border text-center w-15 sm:w-24">Qty (kg)</th>
                 </tr>
               </thead>
               <tbody>
@@ -316,7 +332,7 @@ export default function CalculatorPage({ cowData, onEditCowInfo }: CalculatorPag
             </table>
           </div>
 
-          {/* RATIO BREAKDOWN & UPDATED CLEAN SUGGESTION */}
+          {/* RATIO BREAKDOWN & SMART MULTI-PARAMETER SUGGESTIONS */}
           <div className="p-2 sm:p-2.5 bg-slate-50 border-t border-slate-200 space-y-1.5 text-[10px] sm:text-xs md:text-sm">
             <div className="font-bold text-slate-800 border-b border-slate-200 pb-0.5">
               DM Ratio Breakdown (Conc : Fodder)
@@ -336,33 +352,66 @@ export default function CalculatorPage({ cowData, onEditCowInfo }: CalculatorPag
               </span>
             </div>
 
-            {/* Clean Ratio Suggestion Text (Without heavy background) */}
-            {totalActualDM > 0 && Math.abs(concentrateDiff) > 2 && (
-              <div className="pt-1 flex items-center gap-1.5 text-slate-800 font-semibold text-[11px] sm:text-xs leading-snug">
-                <AlertCircle size={15} className="shrink-0 text-amber-600" />
-                <div>
-                  {concentrateDiff < 0 ? (
-                    <span>
-                      Need Concentrate <b className="text-emerald-700 text-xs sm:text-sm font-extrabold">(+{Math.abs(concentrateDiff)}%)</b> | Need Fodder <b className="text-rose-600 text-xs sm:text-sm font-extrabold">(-{Math.abs(concentrateDiff)}%)</b>
-                    </span>
-                  ) : (
-                    <span>
-                      Need Concentrate <b className="text-rose-600 text-xs sm:text-sm font-extrabold">(-{Math.abs(concentrateDiff)}%)</b> | Need Fodder <b className="text-emerald-700 text-xs sm:text-sm font-extrabold">(+{Math.abs(concentrateDiff)}%)</b>
-                    </span>
-                  )}
-                </div>
-              </div>
-            )}
-            {totalActualDM > 0 && Math.abs(concentrateDiff) <= 2 && (
-              <div className="pt-1 flex items-center gap-1.5 text-emerald-700 font-bold text-[11px] sm:text-xs">
-                <AlertCircle size={15} className="shrink-0 text-emerald-600" />
-                <span>Balanced Ratio!</span>
+            {/* DYNAMIC SUGGESTION TEXT */}
+            {totalActualDM > 0 && (
+              <div className="pt-1.5 border-t border-slate-200/60">
+                {/* 1. RATIO IS NOT BALANCED */}
+                {Math.abs(concentrateDiff) > 2 ? (
+                  <div className="flex items-center gap-1.5 text-slate-800 font-semibold text-[11px] sm:text-xs leading-snug">
+                    <AlertCircle size={15} className="shrink-0 text-amber-600" />
+                    <div>
+                      {concentrateDiff < 0 ? (
+                        <span>
+                          Need Concentrate <b className="text-emerald-700 text-xs sm:text-sm font-extrabold">(+{Math.abs(concentrateDiff)}%)</b> | Need Fodder <b className="text-rose-600 text-xs sm:text-sm font-extrabold">(-{Math.abs(concentrateDiff)}%)</b>
+                        </span>
+                      ) : (
+                        <span>
+                          Need Concentrate <b className="text-rose-600 text-xs sm:text-sm font-extrabold">(-{Math.abs(concentrateDiff)}%)</b> | Need Fodder <b className="text-emerald-700 text-xs sm:text-sm font-extrabold">(+{Math.abs(concentrateDiff)}%)</b>
+                        </span>
+                      )}
+                    </div>
+                  </div>
+                ) : (
+                  /* 2. RATIO IS BALANCED - SHOW ALL PARAMETERS THAT NEED ADJUSTMENT */
+                  <div className="space-y-1">
+                    <div className="flex items-center gap-1 text-emerald-700 font-bold text-[11px] sm:text-xs">
+                      <CheckCircle2 size={14} className="shrink-0 text-emerald-600" />
+                      <span>Balanced Ratio!</span>
+                    </div>
+
+                    {offParameters.length > 0 ? (
+                      <div className="text-[10px] sm:text-xs font-bold text-slate-800 leading-snug">
+                        Balanced ratio but{' '}
+                        {offParameters.map((param, index) => {
+                          const isLast = index === offParameters.length - 1;
+                          const isSecondToLast = index === offParameters.length - 2;
+
+                          let textColor = 'text-emerald-700';
+                          if (param.key === 'cp') textColor = 'text-blue-700';
+                          if (param.key === 'energy') textColor = 'text-purple-700';
+
+                          return (
+                            <React.Fragment key={param.key}>
+                              <span className={`underline uppercase ${textColor}`}>{param.name}</span>
+                              {isSecondToLast ? ' and ' : !isLast ? ', ' : ''}
+                            </React.Fragment>
+                          );
+                        })}
+                        {' '}need to adjust
+                      </div>
+                    ) : (
+                      <div className="text-[10px] sm:text-xs font-semibold text-slate-600">
+                        All parameters near to required
+                      </div>
+                    )}
+                  </div>
+                )}
               </div>
             )}
           </div>
         </div>
 
-        {/* Right Summary Table */}
+        {/* Right Calculation Table */}
         <div className="flex-[40] min-w-0 bg-white rounded-lg shadow-xs border border-slate-200 overflow-hidden">
           <div className="bg-slate-800 text-white p-2 font-semibold text-xs sm:text-sm md:text-base">
             Calculation
@@ -377,22 +426,21 @@ export default function CalculatorPage({ cowData, onEditCowInfo }: CalculatorPag
                 </tr>
               </thead>
               <tbody>
-                {/* 1. UPDATED BACKGROUND COLOR FOR DRY MATTER HEADER */}
-                <tr className="bg-slate-200 font-extrabold text-slate-800 text-[8px] sm:text-[10px] md:text-xs border-b border-slate-300">
+                <tr className="bg-emerald-100 font-extrabold text-emerald-950 text-[8px] sm:text-[10px] md:text-xs border-b border-emerald-200">
                   <td colSpan={2} className="p-1 sm:p-1.5 border">Dry Matter (DM)</td>
                 </tr>
                 <tr>
                   <td className="p-1 sm:p-1.5 border text-slate-700 break-words leading-tight">DM Required (kg)</td>
-                  <td className="p-1 sm:p-1.5 border text-center font-bold bg-slate-50">{dmReq.toFixed(1)}</td>
+                  <td className="p-1 sm:p-1.5 border text-center font-bold bg-slate-50">{dmReq.toFixed(3)}</td>
                 </tr>
                 <tr>
                   <td className="p-1 sm:p-1.5 border text-slate-700 break-words leading-tight">DM Actual (kg)</td>
-                  <td className="p-1 sm:p-1.5 border text-center font-bold bg-slate-50 text-emerald-700">{totalActualDM.toFixed(1)}</td>
+                  <td className="p-1 sm:p-1.5 border text-center font-bold bg-slate-50 text-emerald-700">{totalActualDM.toFixed(3)}</td>
                 </tr>
                 <tr>
                   <td className="p-1 sm:p-1.5 border text-slate-700 break-words leading-tight">DM Difference (kg)</td>
-                  <td className={`p-1 sm:p-1.5 border text-center font-bold bg-slate-50 ${totalActualDM - dmReq < 0 ? 'text-rose-600' : 'text-emerald-700'}`}>
-                    {(totalActualDM - dmReq).toFixed(1)}
+                  <td className={`p-1 sm:p-1.5 border text-center font-bold bg-slate-50 ${dmDiff < 0 ? 'text-rose-600' : 'text-emerald-700'}`}>
+                    {dmDiff.toFixed(3)}
                   </td>
                 </tr>
 
@@ -401,16 +449,16 @@ export default function CalculatorPage({ cowData, onEditCowInfo }: CalculatorPag
                 </tr>
                 <tr>
                   <td className="p-1 sm:p-1.5 border text-slate-700 break-words leading-tight">CP Required (kg)</td>
-                  <td className="p-1 sm:p-1.5 border text-center font-bold bg-slate-50">{cpReq.toFixed(1)}</td>
+                  <td className="p-1 sm:p-1.5 border text-center font-bold bg-slate-50">{cpReq.toFixed(3)}</td>
                 </tr>
                 <tr>
                   <td className="p-1 sm:p-1.5 border text-slate-700 break-words leading-tight">CP Actual (kg)</td>
-                  <td className="p-1 sm:p-1.5 border text-center font-bold bg-slate-50 text-blue-700">{totalActualCP.toFixed(1)}</td>
+                  <td className="p-1 sm:p-1.5 border text-center font-bold bg-slate-50 text-blue-700">{totalActualCP.toFixed(3)}</td>
                 </tr>
                 <tr>
                   <td className="p-1 sm:p-1.5 border text-slate-700 break-words leading-tight">CP Difference (kg)</td>
-                  <td className={`p-1 sm:p-1.5 border text-center font-bold bg-slate-50 ${totalActualCP - cpReq < 0 ? 'text-rose-600' : 'text-emerald-700'}`}>
-                    {(totalActualCP - cpReq).toFixed(1)}
+                  <td className={`p-1 sm:p-1.5 border text-center font-bold bg-slate-50 ${cpDiff < 0 ? 'text-rose-600' : 'text-emerald-700'}`}>
+                    {cpDiff.toFixed(3)}
                   </td>
                 </tr>
 
@@ -427,8 +475,8 @@ export default function CalculatorPage({ cowData, onEditCowInfo }: CalculatorPag
                 </tr>
                 <tr>
                   <td className="p-1 sm:p-1.5 border text-slate-700 break-words leading-tight">Energy Difference (MJ)</td>
-                  <td className={`p-1 sm:p-1.5 border text-center font-bold bg-slate-50 ${totalActualEnergy - energyReq < 0 ? 'text-rose-600' : 'text-emerald-700'}`}>
-                    {(totalActualEnergy - energyReq).toFixed(1)}
+                  <td className={`p-1 sm:p-1.5 border text-center font-bold bg-slate-50 ${energyDiff < 0 ? 'text-rose-600' : 'text-emerald-700'}`}>
+                    {energyDiff.toFixed(1)}
                   </td>
                 </tr>
 
@@ -454,7 +502,7 @@ export default function CalculatorPage({ cowData, onEditCowInfo }: CalculatorPag
 
       </div>
 
-      {/* LOWER TABLES - FIXED FULL ROW HIGHLIGHT ON SELECTION */}
+      {/* LOWER TABLES */}
       <div className="space-y-6 pt-2 w-full">
         
         {/* DM Table */}
