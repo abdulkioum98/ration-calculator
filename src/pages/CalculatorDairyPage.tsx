@@ -426,7 +426,7 @@ export default function CalculatorPage({ cowData, onEditCowInfo }: CalculatorPag
                 </tr>
               </thead>
               <tbody>
-                <tr className="bg-zinc-100 font-extrabold text-emerald-950 text-[8px] sm:text-[10px] md:text-xs border-b border-emerald-200">
+                <tr className="bg-sky-50 font-extrabold text-emerald-950 text-[8px] sm:text-[10px] md:text-xs border-b border-emerald-200">
                   <td colSpan={2} className="p-1 sm:p-1.5 border">Dry Matter (DM)</td>
                 </tr>
                 <tr>
