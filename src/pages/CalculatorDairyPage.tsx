@@ -242,9 +242,9 @@ export default function CalculatorPage({ cowData, onEditCowInfo }: CalculatorPag
         {onEditCowInfo && (
           <button
             onClick={onEditCowInfo}
-            className="bg-white hover:bg-slate-50 text-emerald-800 border border-emerald-300 text-xs font-bold px-2.5 py-1.5 rounded-lg transition-all flex items-center gap-1.5 shrink-0 shadow-2xs"
+            className="bg-white hover:bg-emerald-50 text-emerald-800 border border-emerald-300 hover:border-emerald-400 text-xs font-bold px-3 py-1.5 rounded-lg transition-all duration-200 ease-in-out hover:shadow-md hover:-translate-y-0.5 active:scale-95 cursor-pointer flex items-center gap-1.5 shrink-0 shadow-2xs"
           >
-            <Edit3 size={13} className="text-emerald-700" />
+            <Edit3 size={13} className="text-emerald-700 transition-transform duration-200 group-hover:scale-110" />
             <span className="hidden sm:inline">Edit Info</span>
           </button>
         )}
@@ -277,7 +277,7 @@ export default function CalculatorPage({ cowData, onEditCowInfo }: CalculatorPag
                   return (
                     <tr 
                       key={item.id} 
-                      className={`transition-colors ${isSelected ? 'bg-emerald-100/70 border-l-4 border-l-emerald-600 font-semibold' : 'hover:bg-slate-50'}`}
+                      className={`transition-colors duration-150 ${isSelected ? 'bg-emerald-100/70 border-l-4 border-l-emerald-600 font-semibold' : 'hover:bg-slate-50'}`}
                     >
                       <td className="p-1 sm:p-2 border font-medium text-slate-800 break-words leading-tight">
                         {item.name}
@@ -290,7 +290,7 @@ export default function CalculatorPage({ cowData, onEditCowInfo }: CalculatorPag
                           placeholder="0"
                           value={quantities[item.id] !== undefined && quantities[item.id] !== 0 ? quantities[item.id] : ''}
                           onChange={(e) => handleQuantityChange(item.id, e.target.value)}
-                          className={`w-full border rounded p-1 text-center border-slate-300 focus:outline-none focus:ring-1 focus:ring-emerald-600 font-bold text-xs sm:text-sm md:text-base ${
+                          className={`w-full border rounded p-1 text-center border-slate-300 focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 font-bold text-xs sm:text-sm md:text-base transition-all duration-150 hover:border-emerald-400 cursor-pointer ${
                             isSelected ? 'bg-emerald-50 text-emerald-900 border-emerald-400' : 'bg-white text-emerald-800'
                           }`}
                         />
@@ -307,7 +307,7 @@ export default function CalculatorPage({ cowData, onEditCowInfo }: CalculatorPag
                   return (
                     <tr 
                       key={item.id} 
-                      className={`transition-colors ${isSelected ? 'bg-emerald-100/70 border-l-4 border-l-emerald-600 font-semibold' : 'hover:bg-slate-50'}`}
+                      className={`transition-colors duration-150 ${isSelected ? 'bg-emerald-100/70 border-l-4 border-l-emerald-600 font-semibold' : 'hover:bg-slate-50'}`}
                     >
                       <td className="p-1 sm:p-2 border font-medium text-slate-800 break-words leading-tight">
                         {item.name}
@@ -320,7 +320,7 @@ export default function CalculatorPage({ cowData, onEditCowInfo }: CalculatorPag
                           placeholder="0"
                           value={quantities[item.id] !== undefined && quantities[item.id] !== 0 ? quantities[item.id] : ''}
                           onChange={(e) => handleQuantityChange(item.id, e.target.value)}
-                          className={`w-full border rounded p-1 text-center border-slate-300 focus:outline-none focus:ring-1 focus:ring-emerald-600 font-bold text-xs sm:text-sm md:text-base ${
+                          className={`w-full border rounded p-1 text-center border-slate-300 focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 font-bold text-xs sm:text-sm md:text-base transition-all duration-150 hover:border-emerald-400 cursor-pointer ${
                             isSelected ? 'bg-emerald-50 text-emerald-900 border-emerald-400' : 'bg-white text-emerald-800'
                           }`}
                         />
@@ -426,7 +426,7 @@ export default function CalculatorPage({ cowData, onEditCowInfo }: CalculatorPag
                 </tr>
               </thead>
               <tbody>
-                <tr className="bg-emerald-100 font-extrabold text-emerald-950 text-[8px] sm:text-[10px] md:text-xs border-b border-emerald-200">
+                <tr className="bg-zinc-100 font-extrabold text-emerald-950 text-[8px] sm:text-[10px] md:text-xs border-b border-emerald-200">
                   <td colSpan={2} className="p-1 sm:p-1.5 border">Dry Matter (DM)</td>
                 </tr>
                 <tr>

@@ -213,9 +213,9 @@ export default function CalculatorFatteningPage({ fatteningData, onEditInfo }: C
         {onEditInfo && (
           <button
             onClick={onEditInfo}
-            className="bg-white hover:bg-slate-50 text-emerald-800 border border-emerald-300 text-xs font-bold px-2.5 py-1.5 rounded-lg transition-all flex items-center gap-1.5 shrink-0 shadow-2xs"
+            className="bg-white hover:bg-emerald-50 text-emerald-800 border border-emerald-300 hover:border-emerald-400 text-xs font-bold px-3 py-1.5 rounded-lg transition-all duration-200 ease-in-out hover:shadow-md hover:-translate-y-0.5 active:scale-95 cursor-pointer flex items-center gap-1.5 shrink-0 shadow-2xs"
           >
-            <Edit3 size={13} className="text-emerald-700" />
+            <Edit3 size={13} className="text-emerald-700 transition-transform duration-200 group-hover:scale-110" />
             <span className="hidden sm:inline">Edit Info</span>
           </button>
         )}
@@ -394,7 +394,7 @@ export default function CalculatorFatteningPage({ fatteningData, onEditInfo }: C
                 </tr>
               </thead>
               <tbody>
-                <tr className="bg-emerald-100 font-extrabold text-emerald-950 text-[8px] sm:text-[10px] md:text-xs border-b border-emerald-200">
+                <tr className="bg-zinc-100 font-extrabold text-emerald-950 text-[8px] sm:text-[10px] md:text-xs border-b border-emerald-200">
                   <td colSpan={2} className="p-1 sm:p-1.5 border">Dry Matter (DM)</td>
                 </tr>
                 <tr>

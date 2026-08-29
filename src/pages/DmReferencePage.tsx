@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { supabase } from '../supabaseClient';
-import { ArrowLeft, BookOpen, Edit2, Check, X, Loader2 } from 'lucide-react';
+import { ArrowLeft, BookOpen, Loader2 } from 'lucide-react';
 
 export interface DmReferenceItem {
   id: string;
@@ -22,11 +22,6 @@ interface DmReferencePageProps {
 export default function DmReferencePage({ onBack }: DmReferencePageProps) {
   const [references, setReferences] = useState<DmReferenceItem[]>([]);
   const [loading, setLoading] = useState<boolean>(true);
-  const [editingId, setEditingId] = useState<string | null>(null);
-
-  // Edit states
-  const [concInput, setConcInput] = useState<string>('');
-  const [fodderInput, setFodderInput] = useState<string>('');
 
   const fetchReferences = async () => {
     setLoading(true);
@@ -49,105 +44,38 @@ export default function DmReferencePage({ onBack }: DmReferencePageProps) {
     fetchReferences();
   }, []);
 
-  const handleEditClick = (item: DmReferenceItem) => {
-    setEditingId(item.id);
-    setConcInput(item.concentrate_ratio.toString());
-    setFodderInput(item.fodder_ratio.toString());
-  };
-
-  const handleSaveUpdate = async (id: string) => {
-    const conc = parseFloat(concInput);
-    const fodder = parseFloat(fodderInput);
-
-    if (isNaN(conc) || isNaN(fodder)) {
-      alert('Please enter valid numbers');
-      return;
-    }
-
-    const { error } = await supabase
-      .from('dm_references')
-      .update({
-        concentrate_ratio: conc,
-        fodder_ratio: fodder,
-      })
-      .eq('id', id);
-
-    if (error) {
-      alert('Failed to update: ' + error.message);
-    } else {
-      setReferences((prev) =>
-        prev.map((item) =>
-          item.id === id ? { ...item, concentrate_ratio: conc, fodder_ratio: fodder } : item
-        )
-      );
-      setEditingId(null);
-    }
-  };
-
   const dairyItems = references.filter((r) => r.target_group === 'dairy');
   const heiferItems = references.filter((r) => r.target_group === 'heifer');
   const fatteningItems = references.filter((r) => r.target_group === 'fattening');
 
   const renderReferenceList = (items: DmReferenceItem[]) => (
     <div className="divide-y divide-slate-100">
-      {items.map((item) => (
-        <div key={item.id} className="p-3 flex items-center justify-between text-xs hover:bg-slate-50">
-          <div className="space-y-0.5 pr-2">
-            <p className="font-semibold text-slate-800">{item.stage_name}</p>
-            <p className="text-[10px] text-slate-400">
-              {item.min_days !== undefined && item.min_days !== null
-                ? `Days: ${item.min_days} - ${item.max_days} d`
-                : item.min_months !== undefined && item.min_months !== null
-                ? `Age: ${item.min_months}${item.max_months ? ` - ${item.max_months}` : '+'} Months`
-                : ''}
-            </p>
-          </div>
-
-          {editingId === item.id ? (
-            <div className="flex items-center space-x-1.5">
-              <div className="flex items-center space-x-1 bg-slate-100 p-1 rounded-lg border">
-                <input
-                  type="number"
-                  value={concInput}
-                  onChange={(e) => setConcInput(e.target.value)}
-                  className="w-8 text-center bg-white border rounded text-xs py-0.5 font-bold text-emerald-700"
-                />
-                <span className="text-slate-400 font-bold">:</span>
-                <input
-                  type="number"
-                  value={fodderInput}
-                  onChange={(e) => setFodderInput(e.target.value)}
-                  className="w-8 text-center bg-white border rounded text-xs py-0.5 font-bold text-emerald-700"
-                />
-              </div>
-              <button
-                onClick={() => handleSaveUpdate(item.id)}
-                className="p-1 text-emerald-700 hover:bg-emerald-50 rounded"
-              >
-                <Check size={15} />
-              </button>
-              <button
-                onClick={() => setEditingId(null)}
-                className="p-1 text-slate-400 hover:bg-slate-100 rounded"
-              >
-                <X size={15} />
-              </button>
+      {items.length === 0 ? (
+        <div className="p-3 text-center text-xs text-slate-400">
+          No records found.
+        </div>
+      ) : (
+        items.map((item) => (
+          <div key={item.id} className="p-3 flex items-center justify-between text-xs hover:bg-slate-50 transition">
+            <div className="space-y-0.5 pr-2">
+              <p className="font-semibold text-slate-800">{item.stage_name}</p>
+              <p className="text-[10px] text-slate-400">
+                {item.min_days !== undefined && item.min_days !== null
+                  ? `Days: ${item.min_days} - ${item.max_days} d`
+                  : item.min_months !== undefined && item.min_months !== null
+                  ? `Age: ${item.min_months}${item.max_months ? ` - ${item.max_months}` : '+'} Months`
+                  : ''}
+              </p>
             </div>
-          ) : (
-            <div className="flex items-center space-x-3">
+
+            <div className="flex items-center space-x-3 shrink-0">
               <span className="bg-emerald-50 text-emerald-800 font-bold px-2.5 py-1 rounded-md border border-emerald-200/50">
                 {item.concentrate_ratio} : {item.fodder_ratio}
               </span>
-              <button
-                onClick={() => handleEditClick(item)}
-                className="text-slate-400 hover:text-emerald-700 p-1"
-              >
-                <Edit2 size={13} />
-              </button>
             </div>
-          )}
-        </div>
-      ))}
+          </div>
+        ))
+      )}
     </div>
   );
 

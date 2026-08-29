@@ -104,7 +104,7 @@ export default function CattleInfoPage({ onSaveAndNext, initialData }: CattleInf
                 placeholder="e.g. Holstein Friesian Cross"
                 value={breedType}
                 onChange={(e) => setBreedType(e.target.value)}
-                className="w-full border border-slate-300 rounded-lg p-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-600"
+                className="w-full border border-slate-300 rounded-lg p-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-600 transition-all"
               />
             </div>
 
@@ -118,7 +118,7 @@ export default function CattleInfoPage({ onSaveAndNext, initialData }: CattleInf
                 placeholder="e.g. 36"
                 value={ageMonths}
                 onChange={(e) => setAgeMonths(e.target.value)}
-                className="w-full border border-slate-300 rounded-lg p-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-600"
+                className="w-full border border-slate-300 rounded-lg p-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-600 transition-all"
               />
             </div>
           </div>
@@ -135,7 +135,7 @@ export default function CattleInfoPage({ onSaveAndNext, initialData }: CattleInf
               value={weight}
               onChange={(e) => setWeight(e.target.value)}
               required
-              className="w-full border border-slate-300 rounded-lg p-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-600"
+              className="w-full border border-slate-300 rounded-lg p-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-600 transition-all"
             />
           </div>
 
@@ -147,7 +147,7 @@ export default function CattleInfoPage({ onSaveAndNext, initialData }: CattleInf
             <select
               value={cowType}
               onChange={(e) => setCowType(e.target.value as 'lactating' | 'dry' | 'heifer')}
-              className="w-full border border-slate-300 rounded-lg p-2.5 text-sm font-semibold bg-white focus:outline-none focus:ring-2 focus:ring-emerald-600"
+              className="w-full border border-slate-300 rounded-lg p-2.5 text-sm font-semibold bg-white cursor-pointer hover:border-slate-400 focus:outline-none focus:ring-2 focus:ring-emerald-600 transition-all"
             >
               <option value="lactating">Lactating Cow</option>
               <option value="dry">Dry Cow</option>
@@ -169,7 +169,7 @@ export default function CattleInfoPage({ onSaveAndNext, initialData }: CattleInf
                     placeholder="e.g. 2"
                     value={lactationNo}
                     onChange={(e) => setLactationNo(e.target.value)}
-                    className="w-full border border-slate-300 rounded-lg p-2.5 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-emerald-600"
+                    className="w-full border border-slate-300 rounded-lg p-2.5 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-emerald-600 transition-all"
                   />
                 </div>
 
@@ -185,7 +185,7 @@ export default function CattleInfoPage({ onSaveAndNext, initialData }: CattleInf
                     value={ageLactation}
                     onChange={(e) => setAgeLactation(e.target.value)}
                     required
-                    className="w-full border border-slate-300 rounded-lg p-2.5 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-emerald-600"
+                    className="w-full border border-slate-300 rounded-lg p-2.5 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-emerald-600 transition-all"
                   />
                 </div>
               </div>
@@ -202,7 +202,7 @@ export default function CattleInfoPage({ onSaveAndNext, initialData }: CattleInf
                   value={milkYield}
                   onChange={(e) => setMilkYield(e.target.value)}
                   required
-                  className="w-full border border-slate-300 rounded-lg p-2.5 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-emerald-600"
+                  className="w-full border border-slate-300 rounded-lg p-2.5 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-emerald-600 transition-all"
                 />
               </div>
             </div>
@@ -218,7 +218,7 @@ export default function CattleInfoPage({ onSaveAndNext, initialData }: CattleInf
                 value={nourishFeedName}
                 onChange={(e) => setNourishFeedName(e.target.value)}
                 disabled={loadingFeeds}
-                className="w-full border border-slate-300 rounded-lg p-2.5 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-emerald-600 disabled:bg-slate-100"
+                className="w-full border border-slate-300 rounded-lg p-2.5 text-sm bg-white cursor-pointer hover:border-slate-400 focus:outline-none focus:ring-2 focus:ring-emerald-600 disabled:bg-slate-100 disabled:cursor-not-allowed transition-all"
               >
                 <option value="">-- Select Nourish Feed --</option>
                 {feedList.map((feed) => (
@@ -235,11 +235,13 @@ export default function CattleInfoPage({ onSaveAndNext, initialData }: CattleInf
             </div>
           </div>
 
+          {/* SUBMIT BUTTON */}
           <button
             type="submit"
-            className="w-full mt-4 bg-emerald-700 hover:bg-emerald-800 text-white font-bold py-3 rounded-lg shadow-md transition-all text-sm sm:text-base"
+            className="w-full mt-4 bg-emerald-700 hover:bg-emerald-800 active:scale-[0.99] text-white font-bold py-3 px-6 rounded-lg shadow-md hover:shadow-lg cursor-pointer transition-all duration-200 ease-in-out flex items-center justify-center gap-2 text-sm sm:text-base"
           >
-            Calculate Ration &rarr;
+            <span>Calculate Ration</span>
+            <span className="text-lg">&rarr;</span>
           </button>
         </form>
       </div>
