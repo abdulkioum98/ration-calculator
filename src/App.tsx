@@ -25,7 +25,17 @@ type PageType =
   | 'admin'; // Hidden Admin Page State
 
 export default function App() {
-  const [currentPage, setCurrentPage] = useState<PageType>('cattle-info');
+  // ১. Initial State সেট করার সময় সরাসরি URL চেক করা হয়েছে
+  const [currentPage, setCurrentPage] = useState<PageType>(() => {
+    if (typeof window !== 'undefined') {
+      const path = window.location.pathname.toLowerCase();
+      if (path === '/admin' || path === '/admin/') {
+        return 'admin';
+      }
+    }
+    return 'cattle-info';
+  });
+
   const [sidebarOpen, setSidebarOpen] = useState<boolean>(false);
   const [refPageTitle, setRefPageTitle] = useState<string>('');
 
@@ -33,24 +43,26 @@ export default function App() {
   const [dairyData, setDairyData] = useState<CowData | null>(null);
   const [fatteningData, setFatteningData] = useState<FatteningCowData | null>(null);
 
-  // ব্রাউজারের URL চেক করা (yourwebsite.com/admin থাকলে সরাসরি AdminPage ওপেন করবে)
+  // ২. Browser navigation (Back/Forward বাটন) এবং URL পরিবর্তনের সাথে সিঙ্ক রাখার জন্য
   useEffect(() => {
     const handleUrlCheck = () => {
       const path = window.location.pathname.toLowerCase();
       if (path === '/admin' || path === '/admin/') {
         setCurrentPage('admin');
+      } else if (path === '/' || path === '') {
+        // admin থেকে ব্যাক করলে যেন ডিফল্ট পেজে ফেরে
+        if (currentPage === 'admin') {
+          setCurrentPage('cattle-info');
+        }
       }
     };
 
-    handleUrlCheck();
-
-    // Browser-এর back/forward বাটন হ্যান্ডেল করার জন্য
     window.addEventListener('popstate', handleUrlCheck);
     return () => window.removeEventListener('popstate', handleUrlCheck);
-  }, []);
+  }, [currentPage]);
 
   const handleSidebarNavigate = (id: string, label: string) => {
-    // সাইডবার দিয়ে অন্য পেজে গেলে ইউআরএল থেকে /admin মুছে ক্লিন পাথ সেট করবে
+    // সাইডবার দিয়ে অন্য পেজে গেলে ইউআরএল থেকে /admin মুছে ক্লিন পাথ সেট করবে
     if (window.location.pathname !== '/') {
       window.history.pushState({}, '', '/');
     }
@@ -185,14 +197,17 @@ export default function App() {
           <NourishFeedPage onBack={handleBackToCalculator} />
         )}
 
+        {/* PRICE LIST PAGE */}
         {currentPage === 'price-list' && (
           <PriceListPage onBack={handleBackToCalculator} />
         )}
 
+        {/* FEED NUTRIENTS PAGE */}
         {currentPage === 'feed-nutrients' && (
           <FeedNutrientsPage onBack={handleBackToCalculator} />
         )}
 
+        {/* DM REFERENCE PAGE */}
         {currentPage === 'dm-reference' && (
           <DmReferencePage onBack={handleBackToCalculator} />
         )}
