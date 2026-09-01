@@ -6,10 +6,10 @@ import CalculatorFattening, { FatteningCowData } from './pages/FatteningInfoPage
 import CalculatorPage from './pages/CalculatorDairyPage';
 import CalculatorFatteningPage from './pages/CalculatorFatteningPage';
 import NourishFeedPage from './pages/NourishFeedPage';
-import PriceListPage from './pages/PriceListPage';
-import FeedNutrientsPage from './pages/FeedNutrientsPage';
+import FeedNutrientsPage from './pages/OtherIngredientsPage';
 import DmReferencePage from './pages/DmReferencePage';
-import AdminPage from './pages/AdminPage'; // Admin Page Import
+import AdminPage from './pages/AdminPage';
+import BreedPage from './pages/BreedPage';
 
 export type CattleData = CowData | FatteningCowData;
 
@@ -19,13 +19,16 @@ type PageType =
   | 'calculator'
   | 'fatteningcalculator'
   | 'nourish-feeds'
+  | 'nourish-feeds-reference'
   | 'price-list'
   | 'feed-nutrients'
+  | 'other-ingredients-reference'
   | 'dm-reference'
+  | 'dm-ration-reference'
   | 'admin'; // Hidden Admin Page State
 
 export default function App() {
-  // ১. Initial State সেট করার সময় সরাসরি URL চেক করা হয়েছে
+  // ১. Initial State সেট করার সময় সরাসরি URL চেক করা হয়েছে
   const [currentPage, setCurrentPage] = useState<PageType>(() => {
     if (typeof window !== 'undefined') {
       const path = window.location.pathname.toLowerCase();
@@ -120,6 +123,7 @@ export default function App() {
         isOpen={sidebarOpen}
         onClose={() => setSidebarOpen(false)}
         onNavigate={handleSidebarNavigate}
+        activeId={currentPage}
       />
 
       <main className={`p-3 sm:p-5 mx-auto transition-all duration-300 ${
@@ -192,29 +196,29 @@ export default function App() {
           />
         )}
 
-        {/* OTHER PAGES */}
-        {currentPage === 'nourish-feeds' && (
+        {/* NOURISH FEEDS REFERENCE PAGE */}
+        {(currentPage === 'nourish-feeds' || currentPage === 'nourish-feeds-reference') && (
           <NourishFeedPage onBack={handleBackToCalculator} />
         )}
 
-        {/* PRICE LIST PAGE */}
-        {currentPage === 'price-list' && (
-          <PriceListPage onBack={handleBackToCalculator} />
-        )}
 
-        {/* FEED NUTRIENTS PAGE */}
-        {currentPage === 'feed-nutrients' && (
+        {/* OTHER INGREDIENTS REFERENCE PAGE */}
+        {(currentPage === 'feed-nutrients' || currentPage === 'other-ingredients-reference') && (
           <FeedNutrientsPage onBack={handleBackToCalculator} />
         )}
 
-        {/* DM REFERENCE PAGE */}
-        {currentPage === 'dm-reference' && (
+        {/* DM RATION REFERENCE PAGE */}
+        {(currentPage === 'dm-reference' || currentPage === 'dm-ration-reference') && (
           <DmReferencePage onBack={handleBackToCalculator} />
         )}
 
         {/* 🔒 HIDDEN ADMIN PAGE (Accessed only via /admin URL) */}
         {currentPage === 'admin' && (
           <AdminPage onBack={handleBackToCalculator} />
+        )}
+
+        {currentPage === 'breed-reference' && (
+          <BreedPage onBack={handleBackToCalculator} />
         )}
 
       </main>

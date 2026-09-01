@@ -5,11 +5,14 @@ import { ArrowLeft, FlaskConical, Loader2, Layers } from 'lucide-react';
 export interface NutrientItem {
   id: string;
   name: string;
-  dm_percent: number;
-  cp_percent: number;
-  me_energy: number;
-  feed_type: 'concentrate' | 'fodder';
-  category: 'dairy' | 'fattening';
+  price?: number;
+  dm?: number;
+  dm_percent?: number;
+  cp?: number;
+  cp_percent?: number;
+  me?: number;
+  me_energy?: number;
+  feed_type?: 'concentrate' | 'fodder' | string;
 }
 
 interface FeedNutrientsPageProps {
@@ -19,19 +22,19 @@ interface FeedNutrientsPageProps {
 export default function FeedNutrientsPage({ onBack }: FeedNutrientsPageProps) {
   const [items, setItems] = useState<NutrientItem[]>([]);
   const [activeFeedType, setActiveFeedType] = useState<'concentrate' | 'fodder'>('concentrate');
-  const [activeCategory, setActiveCategory] = useState<'dairy' | 'fattening'>('dairy');
   const [loading, setLoading] = useState(true);
 
-  // Fetch nutrient items from Supabase
+  // Fetch items from Supabase 'other_ingredients' table
   const fetchItems = async () => {
     setLoading(true);
     const { data, error } = await supabase
-      .from('feed_nutrients')
+      .from('other_ingredients')
       .select('*')
-      .order('created_at', { ascending: true });
+      .order('id', { ascending: true });
 
     if (error) {
-      console.error('Error fetching nutrient values:', error);
+      console.error('Error fetching other ingredients:', error);
+      alert('Failed to load ingredients: ' + error.message);
     } else {
       setItems(data || []);
     }
@@ -42,12 +45,14 @@ export default function FeedNutrientsPage({ onBack }: FeedNutrientsPageProps) {
     fetchItems();
   }, []);
 
-  const filteredItems = items.filter(
-    (item) => item.feed_type === activeFeedType && item.category === activeCategory
-  );
+  // Filter items logic (Only Concentrate vs Fodder)
+  const filteredItems = items.filter((item) => {
+    const itemFeedType = item.feed_type ? item.feed_type.toLowerCase() : 'concentrate';
+    return itemFeedType === activeFeedType;
+  });
 
   return (
-    <div className="bg-slate-50 min-h-[85vh] p-3 sm:p-4 rounded-2xl shadow-xs border border-slate-200/80 space-y-3.5 max-w-md mx-auto">
+    <div className="bg-slate-50 min-h-[85vh] p-3 sm:p-4 rounded-2xl shadow-xs border border-slate-200/80 space-y-3.5 max-w-lg mx-auto">
       {/* Header */}
       <div className="flex justify-between items-center bg-white p-3 rounded-xl border border-slate-100 shadow-2xs">
         <div className="flex items-center space-x-2.5">
@@ -55,8 +60,8 @@ export default function FeedNutrientsPage({ onBack }: FeedNutrientsPageProps) {
             <FlaskConical size={18} />
           </div>
           <div>
-            <h2 className="text-base font-bold text-slate-800 leading-none">Nutrient Values</h2>
-            <p className="text-[11px] text-slate-400 mt-0.5">DM (%), CP (%) & ME Energy (MJ/kg)</p>
+            <h2 className="text-base font-bold text-slate-800 leading-none">Other Ingredients Reference</h2>
+            <p className="text-[11px] text-slate-400 mt-0.5">Nutrient values & Price list</p>
           </div>
         </div>
         <button
@@ -94,38 +99,12 @@ export default function FeedNutrientsPage({ onBack }: FeedNutrientsPageProps) {
         </button>
       </div>
 
-      {/* Sub Category Tabs (Dairy vs Fattening) */}
-      <div className="flex bg-white p-1 rounded-xl border border-slate-200 shadow-2xs">
-        <button
-          type="button"
-          onClick={() => setActiveCategory('dairy')}
-          className={`flex-1 py-1.5 text-xs font-semibold rounded-lg transition ${
-            activeCategory === 'dairy'
-              ? 'bg-emerald-50 text-emerald-800 font-bold border border-emerald-200/60'
-              : 'text-slate-500 hover:text-slate-800'
-          }`}
-        >
-          Dairy
-        </button>
-        <button
-          type="button"
-          onClick={() => setActiveCategory('fattening')}
-          className={`flex-1 py-1.5 text-xs font-semibold rounded-lg transition ${
-            activeCategory === 'fattening'
-              ? 'bg-emerald-50 text-emerald-800 font-bold border border-emerald-200/60'
-              : 'text-slate-500 hover:text-slate-800'
-          }`}
-        >
-          Fattening
-        </button>
-      </div>
-
-      {/* Nutrients Table (Read-Only) */}
+      {/* Ingredients Table */}
       <div className="bg-white rounded-xl border border-slate-200/80 shadow-2xs overflow-hidden">
         {loading ? (
           <div className="p-8 flex justify-center items-center text-emerald-700 space-x-2">
             <Loader2 className="animate-spin" size={18} />
-            <span className="text-xs font-medium">Loading nutrients...</span>
+            <span className="text-xs font-medium">Loading ingredients...</span>
           </div>
         ) : (
           <div className="overflow-x-auto">
@@ -135,34 +114,45 @@ export default function FeedNutrientsPage({ onBack }: FeedNutrientsPageProps) {
                   <th className="py-2.5 px-3">Item</th>
                   <th className="py-2.5 px-2 text-center">DM %</th>
                   <th className="py-2.5 px-2 text-center">CP %</th>
-                  <th className="py-2.5 px-2 text-center">ME (MJ/kg)</th>
+                  <th className="py-2.5 px-2 text-center">ME</th>
+                  <th className="py-2.5 px-3 text-right">Price/kg</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-100 text-xs">
                 {filteredItems.length === 0 ? (
                   <tr>
-                    <td colSpan={4} className="py-8 text-center space-y-1">
+                    <td colSpan={5} className="py-8 text-center space-y-1">
                       <Layers className="mx-auto text-slate-300" size={24} />
-                      <p className="text-xs text-slate-400 font-medium">No nutrient data available.</p>
+                      <p className="text-xs text-slate-400 font-medium">No ingredients found in this category.</p>
                     </td>
                   </tr>
                 ) : (
-                  filteredItems.map((item) => (
-                    <tr key={item.id} className="hover:bg-slate-50/80 transition">
-                      <td className="py-2.5 px-3 font-semibold text-slate-800">
-                        {item.name}
-                      </td>
-                      <td className="py-2.5 px-2 text-center text-slate-600 font-medium">
-                        {item.dm_percent}%
-                      </td>
-                      <td className="py-2.5 px-2 text-center text-emerald-700 font-bold">
-                        {item.cp_percent}%
-                      </td>
-                      <td className="py-2.5 px-2 text-center text-amber-700 font-semibold">
-                        {item.me_energy}
-                      </td>
-                    </tr>
-                  ))
+                  filteredItems.map((item) => {
+                    const dmVal = item.dm ?? item.dm_percent ?? '-';
+                    const cpVal = item.cp ?? item.cp_percent ?? '-';
+                    const meVal = item.me ?? item.me_energy ?? '-';
+                    const priceVal = item.price ? `৳${Number(item.price).toFixed(2)}` : '-';
+
+                    return (
+                      <tr key={item.id} className="hover:bg-slate-50/80 transition">
+                        <td className="py-2.5 px-3 font-semibold text-slate-800">
+                          {item.name}
+                        </td>
+                        <td className="py-2.5 px-2 text-center text-slate-600 font-medium">
+                          {dmVal !== '-' ? `${dmVal}%` : '-'}
+                        </td>
+                        <td className="py-2.5 px-2 text-center text-emerald-700 font-bold">
+                          {cpVal !== '-' ? `${cpVal}%` : '-'}
+                        </td>
+                        <td className="py-2.5 px-2 text-center text-amber-700 font-semibold">
+                          {meVal}
+                        </td>
+                        <td className="py-2.5 px-3 text-right font-bold text-emerald-800">
+                          {priceVal}
+                        </td>
+                      </tr>
+                    );
+                  })
                 )}
               </tbody>
             </table>
@@ -177,7 +167,7 @@ export default function FeedNutrientsPage({ onBack }: FeedNutrientsPageProps) {
         className="w-full bg-slate-800 text-white font-semibold py-2.5 rounded-xl text-xs hover:bg-slate-900 transition flex items-center justify-center space-x-1.5 shadow-2xs mt-3"
       >
         <ArrowLeft size={14} />
-        <span>Back to Calculator</span>
+        <span>Back to Main Menu</span>
       </button>
     </div>
   );

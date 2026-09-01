@@ -2,10 +2,9 @@ import React, { useState, useEffect } from 'react';
 import { supabase } from '../supabaseClient';
 import { 
   Lock, LogOut, Plus, Edit3, Trash2, Save, X, Loader2, 
-  Tag, Wheat, FlaskConical, BookOpen, RefreshCw, ArrowLeft 
+  Wheat, FlaskConical, BookOpen, RefreshCw, ArrowLeft, Dna 
 } from 'lucide-react';
 
-// Props Type Definition
 interface AdminPageProps {
   onBack?: () => void;
 }
@@ -17,10 +16,10 @@ export default function AdminPage({ onBack }: AdminPageProps) {
   const [loginError, setLoginError] = useState('');
   const [authenticating, setAuthenticating] = useState(false);
 
-  // Active Tab State
-  const [activeTab, setActiveTab] = useState<'price' | 'nourish' | 'nutrients' | 'dm'>('price');
+  // Active Tab State (Added 'breeds' tab)
+  const [activeTab, setActiveTab] = useState<'nourish' | 'other' | 'dm' | 'breeds'>('nourish');
 
-  // Form Visibility State (Hidden by default)
+  // Form Visibility State
   const [showForm, setShowForm] = useState(false);
 
   // Loading States
@@ -28,37 +27,32 @@ export default function AdminPage({ onBack }: AdminPageProps) {
   const [submitting, setSubmitting] = useState(false);
 
   // Data States
-  const [priceList, setPriceList] = useState<any[]>([]);
   const [nourishFeeds, setNourishFeeds] = useState<any[]>([]);
-  const [nutrients, setNutrients] = useState<any[]>([]);
+  const [otherIngredients, setOtherIngredients] = useState<any[]>([]);
   const [dmReferences, setDmReferences] = useState<any[]>([]);
+  const [breeds, setBreeds] = useState<any[]>([]);
 
-  // Editing ID Trackers
-  const [editId, setEditId] = useState<string | null>(null);
+  // Editing ID Tracker
+  const [editId, setEditId] = useState<string | number | null>(null);
 
-  // Form Fields - Price List & Nutrients Shared/Specific
+  // Form Fields - Common & Specific
   const [itemName, setItemName] = useState('');
-  const [pricePerKg, setPricePerKg] = useState('');
-  const [feedType, setFeedType] = useState<'concentrate' | 'fodder'>('concentrate');
+  const [price, setPrice] = useState('');
+  const [dm, setDm] = useState('');
+  const [cp, setCp] = useState('');
+  const [me, setMe] = useState('');
   const [category, setCategory] = useState<'dairy' | 'fattening'>('dairy');
-  
-  // Form Fields - Nutrients
-  const [dmPercent, setDmPercent] = useState('');
-  const [cpPercent, setCpPercent] = useState('');
-  const [meEnergy, setMeEnergy] = useState('');
-
-  // Form Fields - Nourish Feed
-  const [tpPerKg, setTpPerKg] = useState('');
+  const [feedType, setFeedType] = useState<'concentrate' | 'fodder'>('concentrate');
 
   // Form Fields - DM Reference
   const [stageName, setStageName] = useState('');
   const [targetGroup, setTargetGroup] = useState<'dairy' | 'heifer' | 'fattening'>('dairy');
   const [concentrateRatio, setConcentrateRatio] = useState('');
   const [fodderRatio, setFodderRatio] = useState('');
-  const [minDays, setMinDays] = useState('');
-  const [maxDays, setMaxDays] = useState('');
-  const [minMonths, setMinMonths] = useState('');
-  const [maxMonths, setMaxMonths] = useState('');
+
+  // Form Fields - Breeds
+  const [breedName, setBreedName] = useState('');
+  const [breedCategory, setBreedCategory] = useState<'dairy' | 'fattening'>('dairy');
 
   useEffect(() => {
     const adminStatus = localStorage.getItem('is_admin_logged_in');
@@ -104,18 +98,12 @@ export default function AdminPage({ onBack }: AdminPageProps) {
   const fetchAllData = async () => {
     setLoading(true);
     await Promise.all([
-      fetchPriceList(),
       fetchNourishFeeds(),
-      fetchNutrients(),
-      fetchDmReferences()
+      fetchOtherIngredients(),
+      fetchDmReferences(),
+      fetchBreeds()
     ]);
     setLoading(false);
-  };
-
-  // Fetch Individual Tables
-  const fetchPriceList = async () => {
-    const { data } = await supabase.from('price_list').select('*').order('created_at', { ascending: true });
-    setPriceList(data || []);
   };
 
   const fetchNourishFeeds = async () => {
@@ -123,9 +111,9 @@ export default function AdminPage({ onBack }: AdminPageProps) {
     setNourishFeeds(data || []);
   };
 
-  const fetchNutrients = async () => {
-    const { data } = await supabase.from('feed_nutrients').select('*').order('created_at', { ascending: true });
-    setNutrients(data || []);
+  const fetchOtherIngredients = async () => {
+    const { data } = await supabase.from('other_ingredients').select('*').order('created_at', { ascending: true });
+    setOtherIngredients(data || []);
   };
 
   const fetchDmReferences = async () => {
@@ -133,68 +121,52 @@ export default function AdminPage({ onBack }: AdminPageProps) {
     setDmReferences(data || []);
   };
 
+  const fetchBreeds = async () => {
+    const { data } = await supabase.from('breeds').select('*').order('name', { ascending: true });
+    setBreeds(data || []);
+  };
+
   const resetForm = () => {
     setEditId(null);
     setShowForm(false);
     setItemName('');
-    setPricePerKg('');
-    setFeedType('concentrate');
+    setPrice('');
+    setDm('');
+    setCp('');
+    setMe('');
     setCategory('dairy');
-    setDmPercent('');
-    setCpPercent('');
-    setMeEnergy('');
-    setTpPerKg('');
+    setFeedType('concentrate');
     setStageName('');
     setTargetGroup('dairy');
     setConcentrateRatio('');
     setFodderRatio('');
-    setMinDays('');
-    setMaxDays('');
-    setMinMonths('');
-    setMaxMonths('');
+    setBreedName('');
+    setBreedCategory('dairy');
   };
 
-  const handleTabChange = (tab: 'price' | 'nourish' | 'nutrients' | 'dm') => {
+  const handleTabChange = (tab: 'nourish' | 'other' | 'dm' | 'breeds') => {
     setActiveTab(tab);
     resetForm();
   };
 
-  // Delete Action
-  const handleDelete = async (table: string, id: string) => {
+  const handleDelete = async (table: string, id: string | number) => {
     if (!window.confirm('Are you sure you want to delete this item?')) return;
     const { error } = await supabase.from(table).delete().eq('id', id);
     if (!error) fetchAllData();
-    else alert('Failed to delete item.');
+    else alert('Failed to delete item: ' + error.message);
   };
 
-  // Submit Handlers
-  const handlePriceSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    setSubmitting(true);
-    const payload = {
-      name: itemName,
-      price_per_kg: parseFloat(pricePerKg),
-      feed_type: feedType,
-      category: category
-    };
-
-    if (editId) {
-      await supabase.from('price_list').update(payload).eq('id', editId);
-    } else {
-      await supabase.from('price_list').insert([payload]);
-    }
-    resetForm();
-    fetchPriceList();
-    setSubmitting(false);
-  };
-
+  // Submit Handler for Nourish Feeds
   const handleNourishSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setSubmitting(true);
     const payload = {
       name: itemName,
-      tp_per_kg: parseFloat(tpPerKg),
-      category: category
+      category: category,
+      price: parseFloat(price) || 0,
+      dm: parseFloat(dm) || 0,
+      cp: parseFloat(cp) || 0,
+      me: parseFloat(me) || 0
     };
 
     if (editId) {
@@ -207,28 +179,30 @@ export default function AdminPage({ onBack }: AdminPageProps) {
     setSubmitting(false);
   };
 
-  const handleNutrientSubmit = async (e: React.FormEvent) => {
+  // Submit Handler for Other Ingredients
+  const handleOtherIngredientsSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setSubmitting(true);
     const payload = {
       name: itemName,
-      dm_percent: parseFloat(dmPercent),
-      cp_percent: parseFloat(cpPercent),
-      me_energy: parseFloat(meEnergy),
+      price: parseFloat(price) || 0,    
+      dm: parseFloat(dm) || 0,           
+      cp: parseFloat(cp) || 0,           
+      me: parseFloat(me) || 0,          
       feed_type: feedType,
-      category: category
     };
 
     if (editId) {
-      await supabase.from('feed_nutrients').update(payload).eq('id', editId);
+      await supabase.from('other_ingredients').update(payload).eq('id', editId);
     } else {
-      await supabase.from('feed_nutrients').insert([payload]);
+      await supabase.from('other_ingredients').insert([payload]);
     }
     resetForm();
-    fetchNutrients();
+    fetchOtherIngredients();
     setSubmitting(false);
   };
 
+  // Submit Handler for DM References
   const handleDmSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setSubmitting(true);
@@ -237,11 +211,7 @@ export default function AdminPage({ onBack }: AdminPageProps) {
       stage_name: stageName,
       target_group: targetGroup,
       concentrate_ratio: parseFloat(concentrateRatio),
-      fodder_ratio: parseFloat(fodderRatio),
-      min_days: minDays !== '' ? parseInt(minDays) : null,
-      max_days: maxDays !== '' ? parseInt(maxDays) : null,
-      min_months: minMonths !== '' ? parseInt(minMonths) : null,
-      max_months: maxMonths !== '' ? parseInt(maxMonths) : null,
+      fodder_ratio: parseFloat(fodderRatio)
     };
 
     if (editId) {
@@ -254,6 +224,27 @@ export default function AdminPage({ onBack }: AdminPageProps) {
     setSubmitting(false);
   };
 
+  // Submit Handler for Breeds
+  const handleBreedSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setSubmitting(true);
+    const payload = {
+      name: breedName,
+      category: breedCategory
+    };
+
+    if (editId) {
+      const { error } = await supabase.from('breeds').update(payload).eq('id', editId);
+      if (error) alert(error.message);
+    } else {
+      const { error } = await supabase.from('breeds').insert([payload]);
+      if (error) alert(error.message);
+    }
+    resetForm();
+    fetchBreeds();
+    setSubmitting(false);
+  };
+
   if (!isLoggedIn) {
     return (
       <div className="min-h-[75vh] flex items-center justify-center p-4">
@@ -263,7 +254,7 @@ export default function AdminPage({ onBack }: AdminPageProps) {
               <Lock size={22} />
             </div>
             <h2 className="text-lg font-bold text-slate-800">Admin Login</h2>
-            <p className="text-xs text-slate-500">Sign in to manage feed & price database</p>
+            <p className="text-xs text-slate-500">Sign in to manage feed database</p>
           </div>
 
           {loginError && (
@@ -319,12 +310,12 @@ export default function AdminPage({ onBack }: AdminPageProps) {
   }
 
   return (
-    <div className="bg-slate-50 min-h-[85vh] p-3 sm:p-4 rounded-2xl border border-slate-200 space-y-4 max-w-2xl mx-auto text-xs">
+    <div className="bg-slate-50 min-h-[85vh] p-3 sm:p-4 rounded-2xl border border-slate-200 space-y-4 max-w-3xl mx-auto text-xs">
       {/* Top Header */}
       <div className="flex justify-between items-center bg-white p-3.5 rounded-xl border border-slate-100 shadow-2xs">
         <div>
           <h2 className="text-base font-bold text-slate-800 leading-none">Admin Control Panel</h2>
-          <p className="text-[11px] text-slate-400 mt-0.5">Manage All 4 Page Databases Centrally</p>
+          <p className="text-[11px] text-slate-400 mt-0.5">Manage Database Tables Centrally</p>
         </div>
         <div className="flex items-center space-x-2">
           {onBack && (
@@ -353,17 +344,8 @@ export default function AdminPage({ onBack }: AdminPageProps) {
         </div>
       </div>
 
-      {/* Navigation Tabs */}
+      {/* Navigation Tabs (4 Grid items) */}
       <div className="grid grid-cols-2 sm:grid-cols-4 gap-1.5 p-1 bg-slate-200/80 rounded-xl">
-        <button
-          onClick={() => handleTabChange('price')}
-          className={`py-2 px-2 rounded-lg font-bold flex items-center justify-center space-x-1 transition ${
-            activeTab === 'price' ? 'bg-emerald-800 text-white shadow-xs' : 'text-slate-600 hover:text-slate-900'
-          }`}
-        >
-          <Tag size={13} />
-          <span className="truncate">1. Price List</span>
-        </button>
         <button
           onClick={() => handleTabChange('nourish')}
           className={`py-2 px-2 rounded-lg font-bold flex items-center justify-center space-x-1 transition ${
@@ -371,16 +353,16 @@ export default function AdminPage({ onBack }: AdminPageProps) {
           }`}
         >
           <Wheat size={13} />
-          <span className="truncate">2. Nourish Feed</span>
+          <span className="truncate">1. Nourish Feeds</span>
         </button>
         <button
-          onClick={() => handleTabChange('nutrients')}
+          onClick={() => handleTabChange('other')}
           className={`py-2 px-2 rounded-lg font-bold flex items-center justify-center space-x-1 transition ${
-            activeTab === 'nutrients' ? 'bg-emerald-800 text-white shadow-xs' : 'text-slate-600 hover:text-slate-900'
+            activeTab === 'other' ? 'bg-emerald-800 text-white shadow-xs' : 'text-slate-600 hover:text-slate-900'
           }`}
         >
           <FlaskConical size={13} />
-          <span className="truncate">3. Nutrients</span>
+          <span className="truncate">2. Other Feed</span>
         </button>
         <button
           onClick={() => handleTabChange('dm')}
@@ -389,7 +371,16 @@ export default function AdminPage({ onBack }: AdminPageProps) {
           }`}
         >
           <BookOpen size={13} />
-          <span className="truncate">4. DM Ratio</span>
+          <span className="truncate">3. DM Ratio</span>
+        </button>
+        <button
+          onClick={() => handleTabChange('breeds')}
+          className={`py-2 px-2 rounded-lg font-bold flex items-center justify-center space-x-1 transition ${
+            activeTab === 'breeds' ? 'bg-emerald-800 text-white shadow-xs' : 'text-slate-600 hover:text-slate-900'
+          }`}
+        >
+          <Dna size={13} />
+          <span className="truncate">4. Breeds</span>
         </button>
       </div>
 
@@ -401,13 +392,12 @@ export default function AdminPage({ onBack }: AdminPageProps) {
       ) : (
         <div className="space-y-4">
           
-          {/* Action Header Button: Add Item Toggle */}
           <div className="flex justify-between items-center">
             <span className="font-bold text-slate-700 text-xs">
-              {activeTab === 'price' && 'Price List Entries'}
-              {activeTab === 'nourish' && 'Nourish Feed Entries'}
-              {activeTab === 'nutrients' && 'Nutrient Entries'}
+              {activeTab === 'nourish' && 'Nourish Feeds Table'}
+              {activeTab === 'other' && 'Other Ingredients Table'}
               {activeTab === 'dm' && 'DM Reference Entries'}
+              {activeTab === 'breeds' && 'Cattle Breeds Table'}
             </span>
             <button
               onClick={() => {
@@ -425,38 +415,19 @@ export default function AdminPage({ onBack }: AdminPageProps) {
             </button>
           </div>
 
-          {/* TAB 1: PRICE LIST */}
-          {activeTab === 'price' && (
+          {/* TAB 1: NOURISH FEEDS */}
+          {activeTab === 'nourish' && (
             <div className="space-y-4">
               {showForm && (
-                <form onSubmit={handlePriceSubmit} className="bg-white p-3.5 rounded-xl border border-emerald-200 space-y-3 shadow-sm animate-in fade-in duration-200">
+                <form onSubmit={handleNourishSubmit} className="bg-white p-3.5 rounded-xl border border-emerald-200 space-y-3 shadow-sm">
                   <div className="flex justify-between items-center border-b pb-2 font-bold text-emerald-800">
-                    <span>{editId ? 'Edit Price Item' : 'Add New Price Item'}</span>
+                    <span>{editId ? 'Edit Nourish Feed' : 'Add New Nourish Feed'}</span>
                     <button type="button" onClick={resetForm}><X size={14} /></button>
                   </div>
-                  <div className="grid grid-cols-2 gap-2">
-                    <div>
-                      <label className="text-[10px] text-slate-500">Item Name</label>
-                      <input
-                        type="text" required placeholder="e.g. Rice Polish"
-                        value={itemName} onChange={(e) => setItemName(e.target.value)}
-                        className="w-full border p-1.5 rounded-lg"
-                      />
-                    </div>
-                    <div>
-                      <label className="text-[10px] text-slate-500">Price / Kg (৳)</label>
-                      <input
-                        type="number" step="0.01" required placeholder="e.g. 35.5"
-                        value={pricePerKg} onChange={(e) => setPricePerKg(e.target.value)}
-                        className="w-full border p-1.5 rounded-lg"
-                      />
-                    </div>
-                    <div>
-                      <label className="text-[10px] text-slate-500">Feed Type</label>
-                      <select value={feedType} onChange={(e) => setFeedType(e.target.value as any)} className="w-full border p-1.5 rounded-lg bg-white">
-                        <option value="concentrate">Concentrate</option>
-                        <option value="fodder">Fodder</option>
-                      </select>
+                  <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
+                    <div className="col-span-2">
+                      <label className="text-[10px] text-slate-500">Name</label>
+                      <input type="text" required placeholder="Feed Name" value={itemName} onChange={(e) => setItemName(e.target.value)} className="w-full border p-1.5 rounded-lg" />
                     </div>
                     <div>
                       <label className="text-[10px] text-slate-500">Category</label>
@@ -465,67 +436,21 @@ export default function AdminPage({ onBack }: AdminPageProps) {
                         <option value="fattening">Fattening</option>
                       </select>
                     </div>
-                  </div>
-                  <button type="submit" disabled={submitting} className="w-full bg-emerald-800 text-white py-2 rounded-lg font-bold flex justify-center items-center space-x-1">
-                    {submitting ? <Loader2 size={14} className="animate-spin" /> : editId ? <Save size={14} /> : <Plus size={14} />}
-                    <span>{editId ? 'Update Price Item' : 'Save Price Item'}</span>
-                  </button>
-                </form>
-              )}
-
-              {/* Price List Table */}
-              <div className="bg-white rounded-xl border overflow-hidden">
-                <table className="w-full text-left">
-                  <thead className="bg-slate-100 font-bold border-b text-[11px] uppercase text-slate-600">
-                    <tr>
-                      <th className="p-2.5">Name</th>
-                      <th className="p-2.5">Type / Category</th>
-                      <th className="p-2.5 text-right">Price</th>
-                      <th className="p-2.5 text-center">Action</th>
-                    </tr>
-                  </thead>
-                  <tbody className="divide-y text-slate-700">
-                    {priceList.map((item) => (
-                      <tr key={item.id} className="hover:bg-slate-50">
-                        <td className="p-2.5 font-bold">{item.name}</td>
-                        <td className="p-2.5 text-[10px] text-slate-500 capitalize">{item.feed_type} | {item.category}</td>
-                        <td className="p-2.5 text-right font-bold text-emerald-700">৳{item.price_per_kg?.toFixed(2)}</td>
-                        <td className="p-2.5 text-center space-x-1">
-                          <button onClick={() => { setEditId(item.id); setItemName(item.name); setPricePerKg(item.price_per_kg); setFeedType(item.feed_type); setCategory(item.category); setShowForm(true); }} className="p-1 text-slate-500 hover:text-emerald-700"><Edit3 size={14} /></button>
-                          <button onClick={() => handleDelete('price_list', item.id)} className="p-1 text-slate-500 hover:text-rose-700"><Trash2 size={14} /></button>
-                        </td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
-            </div>
-          )}
-
-          {/* TAB 2: NOURISH FEED */}
-          {activeTab === 'nourish' && (
-            <div className="space-y-4">
-              {showForm && (
-                <form onSubmit={handleNourishSubmit} className="bg-white p-3.5 rounded-xl border border-emerald-200 space-y-3 shadow-sm animate-in fade-in duration-200">
-                  <div className="flex justify-between items-center border-b pb-2 font-bold text-emerald-800">
-                    <span>{editId ? 'Edit Nourish Feed' : 'Add New Nourish Feed'}</span>
-                    <button type="button" onClick={resetForm}><X size={14} /></button>
-                  </div>
-                  <div className="grid grid-cols-2 gap-2">
                     <div>
-                      <label className="text-[10px] text-slate-500">Feed Name</label>
-                      <input type="text" required placeholder="e.g. Nourish Dairy Pellet" value={itemName} onChange={(e) => setItemName(e.target.value)} className="w-full border p-1.5 rounded-lg" />
+                      <label className="text-[10px] text-slate-500">Price (TK)</label>
+                      <input type="number" step="0.01" required value={price} onChange={(e) => setPrice(e.target.value)} className="w-full border p-1.5 rounded-lg" />
                     </div>
                     <div>
-                      <label className="text-[10px] text-slate-500">TP / Kg (৳)</label>
-                      <input type="number" step="0.01" required placeholder="e.g. 48.0" value={tpPerKg} onChange={(e) => setTpPerKg(e.target.value)} className="w-full border p-1.5 rounded-lg" />
+                      <label className="text-[10px] text-slate-500">DM (%)</label>
+                      <input type="number" step="0.01" required value={dm} onChange={(e) => setDm(e.target.value)} className="w-full border p-1.5 rounded-lg" />
                     </div>
-                    <div className="col-span-2">
-                      <label className="text-[10px] text-slate-500">Category</label>
-                      <select value={category} onChange={(e) => setCategory(e.target.value as any)} className="w-full border p-1.5 rounded-lg bg-white">
-                        <option value="dairy">Dairy Feed</option>
-                        <option value="fattening">Fattening Feed</option>
-                      </select>
+                    <div>
+                      <label className="text-[10px] text-slate-500">CP (%)</label>
+                      <input type="number" step="0.01" required value={cp} onChange={(e) => setCp(e.target.value)} className="w-full border p-1.5 rounded-lg" />
+                    </div>
+                    <div className="col-span-2 sm:col-span-1">
+                      <label className="text-[10px] text-slate-500">ME Energy</label>
+                      <input type="number" step="0.01" required value={me} onChange={(e) => setMe(e.target.value)} className="w-full border p-1.5 rounded-lg" />
                     </div>
                   </div>
                   <button type="submit" disabled={submitting} className="w-full bg-emerald-800 text-white py-2 rounded-lg font-bold flex justify-center items-center space-x-1">
@@ -535,13 +460,16 @@ export default function AdminPage({ onBack }: AdminPageProps) {
                 </form>
               )}
 
-              <div className="bg-white rounded-xl border overflow-hidden">
+              <div className="bg-white rounded-xl border overflow-x-auto">
                 <table className="w-full text-left">
                   <thead className="bg-slate-100 font-bold border-b text-[11px] uppercase text-slate-600">
                     <tr>
-                      <th className="p-2.5">Feed Name</th>
+                      <th className="p-2.5">Name</th>
                       <th className="p-2.5">Category</th>
-                      <th className="p-2.5 text-right">Price/kg</th>
+                      <th className="p-2.5 text-center">Price</th>
+                      <th className="p-2.5 text-center">DM %</th>
+                      <th className="p-2.5 text-center">CP %</th>
+                      <th className="p-2.5 text-center">ME</th>
                       <th className="p-2.5 text-center">Action</th>
                     </tr>
                   </thead>
@@ -550,9 +478,21 @@ export default function AdminPage({ onBack }: AdminPageProps) {
                       <tr key={feed.id} className="hover:bg-slate-50">
                         <td className="p-2.5 font-bold">{feed.name}</td>
                         <td className="p-2.5 text-[10px] text-slate-500 capitalize">{feed.category}</td>
-                        <td className="p-2.5 text-right font-bold text-emerald-700">৳{feed.tp_per_kg?.toFixed(2)}</td>
+                        <td className="p-2.5 text-center font-bold text-emerald-700">৳{feed.price ?? 0}</td>
+                        <td className="p-2.5 text-center">{feed.dm ?? 0}%</td>
+                        <td className="p-2.5 text-center">{feed.cp ?? 0}%</td>
+                        <td className="p-2.5 text-center">{feed.me ?? 0}</td>
                         <td className="p-2.5 text-center space-x-1">
-                          <button onClick={() => { setEditId(feed.id); setItemName(feed.name); setTpPerKg(feed.tp_per_kg); setCategory(feed.category); setShowForm(true); }} className="p-1 text-slate-500 hover:text-emerald-700"><Edit3 size={14} /></button>
+                          <button onClick={() => { 
+                            setEditId(feed.id); 
+                            setItemName(feed.name || ''); 
+                            setCategory(feed.category || 'dairy');
+                            setPrice(feed.price ?? ''); 
+                            setDm(feed.dm ?? ''); 
+                            setCp(feed.cp ?? ''); 
+                            setMe(feed.me ?? ''); 
+                            setShowForm(true); 
+                          }} className="p-1 text-slate-500 hover:text-emerald-700"><Edit3 size={14} /></button>
                           <button onClick={() => handleDelete('nourish_feeds', feed.id)} className="p-1 text-slate-500 hover:text-rose-700"><Trash2 size={14} /></button>
                         </td>
                       </tr>
@@ -563,50 +503,47 @@ export default function AdminPage({ onBack }: AdminPageProps) {
             </div>
           )}
 
-          {/* TAB 3: NUTRIENT VALUES */}
-          {activeTab === 'nutrients' && (
+          {/* TAB 2: OTHER INGREDIENTS */}
+          {activeTab === 'other' && (
             <div className="space-y-4">
               {showForm && (
-                <form onSubmit={handleNutrientSubmit} className="bg-white p-3.5 rounded-xl border border-emerald-200 space-y-3 shadow-sm animate-in fade-in duration-200">
+                <form onSubmit={handleOtherIngredientsSubmit} className="bg-white p-3.5 rounded-xl border border-emerald-200 space-y-3 shadow-sm">
                   <div className="flex justify-between items-center border-b pb-2 font-bold text-emerald-800">
-                    <span>{editId ? 'Edit Nutrient Entry' : 'Add New Nutrient Entry'}</span>
+                    <span>{editId ? 'Edit Other Ingredient' : 'Add New Other Ingredient'}</span>
                     <button type="button" onClick={resetForm}><X size={14} /></button>
                   </div>
-                  <div className="grid grid-cols-2 gap-2">
-                    <div>
-                      <label className="text-[10px] text-slate-500">Item Name</label>
-                      <input type="text" required placeholder="e.g. Maize Crushed" value={itemName} onChange={(e) => setItemName(e.target.value)} className="w-full border p-1.5 rounded-lg" />
+                  <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
+                    <div className="col-span-2">
+                      <label className="text-[10px] text-slate-500">Name</label>
+                      <input type="text" required placeholder="Ingredient Name" value={itemName} onChange={(e) => setItemName(e.target.value)} className="w-full border p-1.5 rounded-lg" />
                     </div>
                     <div>
-                      <label className="text-[10px] text-slate-500">DM (%)</label>
-                      <input type="number" step="0.1" required placeholder="e.g. 88" value={dmPercent} onChange={(e) => setDmPercent(e.target.value)} className="w-full border p-1.5 rounded-lg" />
-                    </div>
-                    <div>
-                      <label className="text-[10px] text-slate-500">CP (%)</label>
-                      <input type="number" step="0.1" required placeholder="e.g. 9.5" value={cpPercent} onChange={(e) => setCpPercent(e.target.value)} className="w-full border p-1.5 rounded-lg" />
-                    </div>
-                    <div>
-                      <label className="text-[10px] text-slate-500">ME Energy (MJ/kg)</label>
-                      <input type="number" step="0.01" required placeholder="e.g. 12.2" value={meEnergy} onChange={(e) => setMeEnergy(e.target.value)} className="w-full border p-1.5 rounded-lg" />
-                    </div>
-                    <div>
-                      <label className="text-[10px] text-slate-500">Type</label>
+                      <label className="text-[10px] text-slate-500">Feed Type</label>
                       <select value={feedType} onChange={(e) => setFeedType(e.target.value as any)} className="w-full border p-1.5 rounded-lg bg-white">
                         <option value="concentrate">Concentrate</option>
                         <option value="fodder">Fodder</option>
                       </select>
                     </div>
                     <div>
-                      <label className="text-[10px] text-slate-500">Category</label>
-                      <select value={category} onChange={(e) => setCategory(e.target.value as any)} className="w-full border p-1.5 rounded-lg bg-white">
-                        <option value="dairy">Dairy</option>
-                        <option value="fattening">Fattening</option>
-                      </select>
+                      <label className="text-[10px] text-slate-500">Price (TK)</label>
+                      <input type="number" step="0.01" required value={price} onChange={(e) => setPrice(e.target.value)} className="w-full border p-1.5 rounded-lg" />
+                    </div>
+                    <div>
+                      <label className="text-[10px] text-slate-500">DM (%)</label>
+                      <input type="number" step="0.01" required value={dm} onChange={(e) => setDm(e.target.value)} className="w-full border p-1.5 rounded-lg" />
+                    </div>
+                    <div>
+                      <label className="text-[10px] text-slate-500">CP (%)</label>
+                      <input type="number" step="0.01" required value={cp} onChange={(e) => setCp(e.target.value)} className="w-full border p-1.5 rounded-lg" />
+                    </div>
+                    <div className="col-span-2 sm:col-span-1">
+                      <label className="text-[10px] text-slate-500">ME Energy</label>
+                      <input type="number" step="0.01" required value={me} onChange={(e) => setMe(e.target.value)} className="w-full border p-1.5 rounded-lg" />
                     </div>
                   </div>
                   <button type="submit" disabled={submitting} className="w-full bg-emerald-800 text-white py-2 rounded-lg font-bold flex justify-center items-center space-x-1">
                     {submitting ? <Loader2 size={14} className="animate-spin" /> : editId ? <Save size={14} /> : <Plus size={14} />}
-                    <span>{editId ? 'Update Nutrient Item' : 'Save Nutrient Item'}</span>
+                    <span>{editId ? 'Update Ingredient' : 'Save Ingredient'}</span>
                   </button>
                 </form>
               )}
@@ -616,6 +553,8 @@ export default function AdminPage({ onBack }: AdminPageProps) {
                   <thead className="bg-slate-100 font-bold border-b text-[11px] uppercase text-slate-600">
                     <tr>
                       <th className="p-2.5">Name</th>
+                      <th className="p-2.5 text-center">Feed Type</th>
+                      <th className="p-2.5 text-center">Price</th>
                       <th className="p-2.5 text-center">DM %</th>
                       <th className="p-2.5 text-center">CP %</th>
                       <th className="p-2.5 text-center">ME</th>
@@ -623,15 +562,30 @@ export default function AdminPage({ onBack }: AdminPageProps) {
                     </tr>
                   </thead>
                   <tbody className="divide-y text-slate-700">
-                    {nutrients.map((item) => (
+                    {otherIngredients.map((item) => (
                       <tr key={item.id} className="hover:bg-slate-50">
                         <td className="p-2.5 font-bold">{item.name}</td>
-                        <td className="p-2.5 text-center">{item.dm_percent}%</td>
-                        <td className="p-2.5 text-center text-emerald-700 font-bold">{item.cp_percent}%</td>
-                        <td className="p-2.5 text-center text-amber-700">{item.me_energy}</td>
+                        <td className="p-2.5 text-center capitalize">
+                          <span className={`px-2 py-0.5 rounded text-[10px] font-bold ${item.feed_type === 'fodder' ? 'bg-emerald-100 text-emerald-800' : 'bg-amber-100 text-amber-800'}`}>
+                            {item.feed_type || 'concentrate'}
+                          </span>
+                        </td>
+                        <td className="p-2.5 text-center font-bold text-emerald-700">৳{item.price_per_kg ?? item.price ?? 0}</td>
+                        <td className="p-2.5 text-center">{item.dm_percent ?? item.dm ?? 0}%</td>
+                        <td className="p-2.5 text-center">{item.cp_percent ?? item.cp ?? 0}%</td>
+                        <td className="p-2.5 text-center">{item.me_energy ?? item.me ?? 0}</td>
                         <td className="p-2.5 text-center space-x-1">
-                          <button onClick={() => { setEditId(item.id); setItemName(item.name); setDmPercent(item.dm_percent); setCpPercent(item.cp_percent); setMeEnergy(item.me_energy); setFeedType(item.feed_type); setCategory(item.category); setShowForm(true); }} className="p-1 text-slate-500 hover:text-emerald-700"><Edit3 size={14} /></button>
-                          <button onClick={() => handleDelete('feed_nutrients', item.id)} className="p-1 text-slate-500 hover:text-rose-700"><Trash2 size={14} /></button>
+                          <button onClick={() => { 
+                            setEditId(item.id); 
+                            setItemName(item.name || ''); 
+                            setPrice(item.price_per_kg ?? item.price ?? ''); 
+                            setDm(item.dm_percent ?? item.dm ?? ''); 
+                            setCp(item.cp_percent ?? item.cp ?? ''); 
+                            setMe(item.me_energy ?? item.me ?? ''); 
+                            setFeedType(item.feed_type || 'concentrate');
+                            setShowForm(true); 
+                          }} className="p-1 text-slate-500 hover:text-emerald-700"><Edit3 size={14} /></button>
+                          <button onClick={() => handleDelete('other_ingredients', item.id)} className="p-1 text-slate-500 hover:text-rose-700"><Trash2 size={14} /></button>
                         </td>
                       </tr>
                     ))}
@@ -641,11 +595,11 @@ export default function AdminPage({ onBack }: AdminPageProps) {
             </div>
           )}
 
-          {/* TAB 4: DM RATIO REFERENCE */}
+          {/* TAB 3: DM RATIO */}
           {activeTab === 'dm' && (
             <div className="space-y-4">
               {showForm && (
-                <form onSubmit={handleDmSubmit} className="bg-white p-3.5 rounded-xl border border-emerald-200 space-y-3 shadow-sm animate-in fade-in duration-200">
+                <form onSubmit={handleDmSubmit} className="bg-white p-3.5 rounded-xl border border-emerald-200 space-y-3 shadow-sm">
                   <div className="flex justify-between items-center border-b pb-2 font-bold text-emerald-800">
                     <span>{editId ? 'Edit DM Reference' : 'Add New DM Reference'}</span>
                     <button type="button" onClick={resetForm}><X size={14} /></button>
@@ -665,25 +619,11 @@ export default function AdminPage({ onBack }: AdminPageProps) {
                     </div>
                     <div>
                       <label className="text-[10px] text-slate-500">Concentrate Ratio</label>
-                      <input type="number" step="0.1" required placeholder="e.g. 60" value={concentrateRatio} onChange={(e) => setConcentrateRatio(e.target.value)} className="w-full border p-1.5 rounded-lg" />
+                      <input type="number" step="0.1" required value={concentrateRatio} onChange={(e) => setConcentrateRatio(e.target.value)} className="w-full border p-1.5 rounded-lg" />
                     </div>
                     <div>
                       <label className="text-[10px] text-slate-500">Fodder Ratio</label>
-                      <input type="number" step="0.1" required placeholder="e.g. 40" value={fodderRatio} onChange={(e) => setFodderRatio(e.target.value)} className="w-full border p-1.5 rounded-lg" />
-                    </div>
-                    <div>
-                      <label className="text-[10px] text-slate-500">Min - Max Days</label>
-                      <div className="flex gap-1">
-                        <input type="number" placeholder="Min" value={minDays} onChange={(e) => setMinDays(e.target.value)} className="w-1/2 border p-1 rounded-lg" />
-                        <input type="number" placeholder="Max" value={maxDays} onChange={(e) => setMaxDays(e.target.value)} className="w-1/2 border p-1 rounded-lg" />
-                      </div>
-                    </div>
-                    <div>
-                      <label className="text-[10px] text-slate-500">Min - Max Months</label>
-                      <div className="flex gap-1">
-                        <input type="number" placeholder="Min" value={minMonths} onChange={(e) => setMinMonths(e.target.value)} className="w-1/2 border p-1 rounded-lg" />
-                        <input type="number" placeholder="Max" value={maxMonths} onChange={(e) => setMaxMonths(e.target.value)} className="w-1/2 border p-1 rounded-lg" />
-                      </div>
+                      <input type="number" step="0.1" required value={fodderRatio} onChange={(e) => setFodderRatio(e.target.value)} className="w-full border p-1.5 rounded-lg" />
                     </div>
                   </div>
                   <button type="submit" disabled={submitting} className="w-full bg-emerald-800 text-white py-2 rounded-lg font-bold flex justify-center items-center space-x-1">
@@ -710,7 +650,7 @@ export default function AdminPage({ onBack }: AdminPageProps) {
                         <td className="p-2.5 text-[10px] text-slate-500 capitalize">{ref.target_group}</td>
                         <td className="p-2.5 text-center font-bold text-emerald-800">{ref.concentrate_ratio} : {ref.fodder_ratio}</td>
                         <td className="p-2.5 text-center space-x-1">
-                          <button onClick={() => { setEditId(ref.id); setStageName(ref.stage_name); setTargetGroup(ref.target_group); setConcentrateRatio(ref.concentrate_ratio); setFodderRatio(ref.fodder_ratio); setMinDays(ref.min_days || ''); setMaxDays(ref.max_days || ''); setMinMonths(ref.min_months || ''); setMaxMonths(ref.max_months || ''); setShowForm(true); }} className="p-1 text-slate-500 hover:text-emerald-700"><Edit3 size={14} /></button>
+                          <button onClick={() => { setEditId(ref.id); setStageName(ref.stage_name); setTargetGroup(ref.target_group); setConcentrateRatio(ref.concentrate_ratio); setFodderRatio(ref.fodder_ratio); setShowForm(true); }} className="p-1 text-slate-500 hover:text-emerald-700"><Edit3 size={14} /></button>
                           <button onClick={() => handleDelete('dm_references', ref.id)} className="p-1 text-slate-500 hover:text-rose-700"><Trash2 size={14} /></button>
                         </td>
                       </tr>
@@ -720,6 +660,90 @@ export default function AdminPage({ onBack }: AdminPageProps) {
               </div>
             </div>
           )}
+
+          {/* TAB 4: BREEDS */}
+          {activeTab === 'breeds' && (
+            <div className="space-y-4">
+              {showForm && (
+                <form onSubmit={handleBreedSubmit} className="bg-white p-3.5 rounded-xl border border-emerald-200 space-y-3 shadow-sm">
+                  <div className="flex justify-between items-center border-b pb-2 font-bold text-emerald-800">
+                    <span>{editId ? 'Edit Cattle Breed' : 'Add New Cattle Breed'}</span>
+                    <button type="button" onClick={resetForm}><X size={14} /></button>
+                  </div>
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                    <div>
+                      <label className="text-[10px] text-slate-500">Breed Name</label>
+                      <input 
+                        type="text" 
+                        required 
+                        placeholder="e.g. Holstein Friesian" 
+                        value={breedName} 
+                        onChange={(e) => setBreedName(e.target.value)} 
+                        className="w-full border p-1.5 rounded-lg" 
+                      />
+                    </div>
+                    <div>
+                      <label className="text-[10px] text-slate-500">Category</label>
+                      <select 
+                        value={breedCategory} 
+                        onChange={(e) => setBreedCategory(e.target.value as any)} 
+                        className="w-full border p-1.5 rounded-lg bg-white"
+                      >
+                        <option value="dairy">Dairy</option>
+                        <option value="fattening">Fattening</option>
+                      </select>
+                    </div>
+                  </div>
+                  <button type="submit" disabled={submitting} className="w-full bg-emerald-800 text-white py-2 rounded-lg font-bold flex justify-center items-center space-x-1">
+                    {submitting ? <Loader2 size={14} className="animate-spin" /> : editId ? <Save size={14} /> : <Plus size={14} />}
+                    <span>{editId ? 'Update Breed' : 'Save Breed'}</span>
+                  </button>
+                </form>
+              )}
+
+              <div className="bg-white rounded-xl border overflow-hidden">
+                <table className="w-full text-left">
+                  <thead className="bg-slate-100 font-bold border-b text-[11px] uppercase text-slate-600">
+                    <tr>
+                      <th className="p-2.5">Breed Name</th>
+                      <th className="p-2.5 text-center">Category</th>
+                      <th className="p-2.5 text-center">Action</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y text-slate-700">
+                    {breeds.length === 0 ? (
+                      <tr>
+                        <td colSpan={3} className="p-4 text-center text-slate-400 font-medium">
+                          No breeds found.
+                        </td>
+                      </tr>
+                    ) : (
+                      breeds.map((breed) => (
+                        <tr key={breed.id} className="hover:bg-slate-50">
+                          <td className="p-2.5 font-bold">{breed.name}</td>
+                          <td className="p-2.5 text-center capitalize">
+                            <span className={`px-2 py-0.5 rounded text-[10px] font-bold ${breed.category === 'dairy' ? 'bg-emerald-100 text-emerald-800' : 'bg-amber-100 text-amber-800'}`}>
+                              {breed.category}
+                            </span>
+                          </td>
+                          <td className="p-2.5 text-center space-x-1">
+                            <button onClick={() => { 
+                              setEditId(breed.id); 
+                              setBreedName(breed.name || ''); 
+                              setBreedCategory(breed.category || 'dairy');
+                              setShowForm(true); 
+                            }} className="p-1 text-slate-500 hover:text-emerald-700"><Edit3 size={14} /></button>
+                            <button onClick={() => handleDelete('breeds', breed.id)} className="p-1 text-slate-500 hover:text-rose-700"><Trash2 size={14} /></button>
+                          </td>
+                        </tr>
+                      ))
+                    )}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          )}
+
         </div>
       )}
     </div>

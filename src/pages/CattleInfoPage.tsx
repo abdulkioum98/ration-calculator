@@ -24,6 +24,11 @@ interface FeedOption {
   name: string;
 }
 
+interface BreedOption {
+  id: string;
+  name: string;
+}
+
 export default function CattleInfoPage({ onSaveAndNext, initialData }: CattleInfoPageProps) {
   // Dairy Specific Fields
   const [breedType, setBreedType] = useState<string>(initialData?.breedType || '');
@@ -36,14 +41,18 @@ export default function CattleInfoPage({ onSaveAndNext, initialData }: CattleInf
   const [ageLactation, setAgeLactation] = useState<string>(initialData?.ageLactation || '');
   const [milkYield, setMilkYield] = useState<string>(initialData?.milkYield || '');
 
-  // Feed State
+  // Feed & Breed State
   const [nourishFeedName, setNourishFeedName] = useState<string>(initialData?.nourishFeedName || '');
   const [feedList, setFeedList] = useState<FeedOption[]>([]);
   const [loadingFeeds, setLoadingFeeds] = useState<boolean>(false);
 
-  // Fetch Dairy feeds from Supabase
+  const [breedList, setBreedList] = useState<BreedOption[]>([]);
+  const [loadingBreeds, setLoadingBreeds] = useState<boolean>(false);
+
+  // Fetch Dairy feeds & Breeds from Supabase
   useEffect(() => {
     fetchDairyFeeds();
+    fetchDairyBreeds();
   }, []);
 
   const fetchDairyFeeds = async () => {
@@ -60,6 +69,24 @@ export default function CattleInfoPage({ onSaveAndNext, initialData }: CattleInf
       console.error('Error fetching Dairy feeds:', err);
     } finally {
       setLoadingFeeds(false);
+    }
+  };
+
+  const fetchDairyBreeds = async () => {
+    setLoadingBreeds(true);
+    try {
+      const { data, error } = await supabase
+        .from('breeds')
+        .select('id, name')
+        .ilike('category', 'dairy')
+        .order('name', { ascending: true });
+
+      if (error) throw error;
+      setBreedList(data || []);
+    } catch (err) {
+      console.error('Error fetching Dairy breeds:', err);
+    } finally {
+      setLoadingBreeds(false);
     }
   };
 
@@ -95,17 +122,31 @@ export default function CattleInfoPage({ onSaveAndNext, initialData }: CattleInf
         <form onSubmit={handleSubmit} className="space-y-4">
           {/* GENERAL INFO SECTION */}
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            {/* BREEDS DROPDOWN */}
             <div>
               <label className="block text-sm font-semibold text-slate-700 mb-1">
                 Breed Type
               </label>
-              <input
-                type="text"
-                placeholder="e.g. Holstein Friesian Cross"
-                value={breedType}
-                onChange={(e) => setBreedType(e.target.value)}
-                className="w-full border border-slate-300 rounded-lg p-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-600 transition-all"
-              />
+              <div className="relative">
+                <select
+                  value={breedType}
+                  onChange={(e) => setBreedType(e.target.value)}
+                  disabled={loadingBreeds}
+                  className="w-full border border-slate-300 rounded-lg p-2.5 text-sm bg-white cursor-pointer hover:border-slate-400 focus:outline-none focus:ring-2 focus:ring-emerald-600 disabled:bg-slate-100 disabled:cursor-not-allowed transition-all"
+                >
+                  <option value="">-- Select Breed --</option>
+                  {breedList.map((breed) => (
+                    <option key={breed.id} value={breed.name}>
+                      {breed.name}
+                    </option>
+                  ))}
+                </select>
+                {loadingBreeds && (
+                  <div className="absolute right-3 top-3">
+                    <Loader2 className="animate-spin text-slate-400" size={16} />
+                  </div>
+                )}
+              </div>
             </div>
 
             <div>

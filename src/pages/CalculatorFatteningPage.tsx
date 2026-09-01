@@ -39,18 +39,62 @@ export default function CalculatorFatteningPage({ fatteningData, onEditInfo }: C
   const fetchCalculatorData = async () => {
     setLoading(true);
     try {
-      const { data: priceData, error: priceError } = await supabase
-        .from('price_list')
-        .select('*')
+      // 1. Fetch Nourish Feeds (Fattening Category)
+      const { data: nourishFeeds, error: nourishErr } = await supabase
+        .from('nourish_feeds')
+        .select('id, name, price, category, dm, cp, me')
         .ilike('category', 'fattening');
 
-      const { data: nutrientData, error: nutrientError } = await supabase
-        .from('feed_nutrients')
-        .select('id, name, dm_percent, cp_percent, me_energy, category, feed_type')
-        .ilike('category', 'fattening');
+      // 2. Fetch Other Ingredients (Concentrate & Fodder)
+      const { data: otherFeeds, error: otherErr } = await supabase
+        .from('other_ingredients')
+        .select('id, name, price, feed_type, dm, cp, me')
+        .or('feed_type.ilike.concentrate,feed_type.ilike.fodder');
 
-      if (priceError) throw priceError;
-      if (nutrientError) throw nutrientError;
+      if (nourishErr) throw nourishErr;
+      if (otherErr) throw otherErr;
+
+      // Nourish Feeds Mapping (Default feed_type -> concentrate)
+      const mappedNourishPrice: PriceListItem[] = (nourishFeeds || []).map((item: any) => ({
+        id: item.id,
+        name: item.name,
+        price_per_kg: item.price || 0,
+        feed_type: 'concentrate',
+        category: item.category || 'fattening',
+      }));
+
+      const mappedNourishNutrient: FeedNutrientItem[] = (nourishFeeds || []).map((item: any) => ({
+        id: item.id,
+        name: item.name,
+        category: item.category || 'fattening',
+        feed_type: 'concentrate',
+        dm_percent: item.dm || 0,
+        cp_percent: item.cp || 0,
+        me_energy: item.me || 0,
+      }));
+
+      // Other Ingredients Mapping
+      const mappedOtherPrice: PriceListItem[] = (otherFeeds || []).map((item: any) => ({
+        id: item.id,
+        name: item.name,
+        price_per_kg: item.price || 0,
+        feed_type: item.feed_type || 'concentrate',
+        category: 'other',
+      }));
+
+      const mappedOtherNutrient: FeedNutrientItem[] = (otherFeeds || []).map((item: any) => ({
+        id: item.id,
+        name: item.name,
+        category: 'other',
+        feed_type: item.feed_type || 'concentrate',
+        dm_percent: item.dm || 0,
+        cp_percent: item.cp || 0,
+        me_energy: item.me || 0,
+      }));
+
+      // Merge nourish feeds + other ingredients
+      const combinedPrice = [...mappedNourishPrice, ...mappedOtherPrice];
+      const combinedNutrient = [...mappedNourishNutrient, ...mappedOtherNutrient];
 
       const sortNourishFirst = <T extends { name: string }>(list: T[]) => {
         return [...list].sort((a, b) => {
@@ -62,8 +106,8 @@ export default function CalculatorFatteningPage({ fatteningData, onEditInfo }: C
         });
       };
 
-      setPriceList(sortNourishFirst(priceData || []));
-      setNutrientList(sortNourishFirst(nutrientData || []));
+      setPriceList(sortNourishFirst(combinedPrice));
+      setNutrientList(sortNourishFirst(combinedNutrient));
     } catch (err) {
       console.error('Error fetching fattening calculator data:', err);
     } finally {
@@ -82,7 +126,7 @@ export default function CalculatorFatteningPage({ fatteningData, onEditInfo }: C
   };
 
   const bodyWeight = parseFloat(fatteningData?.weight || '0');
-  const targetGainPerDay = parseFloat(fatteningData?.targetWeightGain || '0'); // in grams or kg base based on form
+  const targetGainPerDay = parseFloat(fatteningData?.targetWeightGain || '0');
   const ageMonths = parseFloat(fatteningData?.ageMonths || '0');
   const breedType = fatteningData?.breedType;
   const nourishFeedName = fatteningData?.nourishFeedName;

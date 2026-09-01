@@ -3,18 +3,10 @@ import { supabase } from '../supabaseClient';
 import { Loader2, AlertCircle, Edit3, CheckCircle2 } from 'lucide-react';
 import { CowData } from './CattleInfoPage';
 
-interface PriceListItem {
+interface FeedItem {
   id: string;
   name: string;
   price_per_kg: number;
-  feed_type: string;
-  category: string;
-}
-
-interface FeedNutrientItem {
-  id: string;
-  name: string;
-  category: string;
   feed_type: string;
   dm_percent: number;
   cp_percent: number;
@@ -28,8 +20,7 @@ interface CalculatorPageProps {
 
 export default function CalculatorPage({ cowData, onEditCowInfo }: CalculatorPageProps) {
   const [loading, setLoading] = useState<boolean>(true);
-  const [priceList, setPriceList] = useState<PriceListItem[]>([]);
-  const [nutrientList, setNutrientList] = useState<FeedNutrientItem[]>([]);
+  const [itemList, setItemList] = useState<FeedItem[]>([]);
   const [quantities, setQuantities] = useState<{ [key: string]: number }>({});
 
   useEffect(() => {
@@ -39,31 +30,54 @@ export default function CalculatorPage({ cowData, onEditCowInfo }: CalculatorPag
   const fetchCalculatorData = async () => {
     setLoading(true);
     try {
-      const { data: priceData, error: priceError } = await supabase
-        .from('price_list')
+      // 1. Fetch Dairy feeds from nourish_feeds (Always Concentrate)
+      const { data: nourishData, error: nourishError } = await supabase
+        .from('nourish_feeds')
         .select('*')
         .ilike('category', 'dairy');
 
-      const { data: nutrientData, error: nutrientError } = await supabase
-        .from('feed_nutrients')
-        .select('id, name, dm_percent, cp_percent, me_energy, category, feed_type')
-        .ilike('category', 'dairy');
+      // 2. Fetch all items from other_ingredients
+      const { data: otherData, error: otherError } = await supabase
+        .from('other_ingredients')
+        .select('*');
 
-      if (priceError) throw priceError;
-      if (nutrientError) throw nutrientError;
+      if (nourishError) throw nourishError;
+      if (otherError) throw otherError;
 
-      const sortNourishFirst = <T extends { name: string }>(list: T[]) => {
-        return [...list].sort((a, b) => {
-          const aIsNourish = a.name.toLowerCase().includes('nourish');
-          const bIsNourish = b.name.toLowerCase().includes('nourish');
-          if (aIsNourish && !bIsNourish) return -1;
-          if (!aIsNourish && bIsNourish) return 1;
-          return 0;
-        });
-      };
+      // Map Nourish feeds
+      const formattedNourish: FeedItem[] = (nourishData || []).map((item) => ({
+        id: `nourish_${item.id}`,
+        name: item.name,
+        price_per_kg: parseFloat(item.price) || 0,
+        feed_type: 'concentrate', // nourish feeds under dairy are concentrates
+        dm_percent: parseFloat(item.dm) || 0,
+        cp_percent: parseFloat(item.cp) || 0,
+        me_energy: parseFloat(item.me) || 0,
+      }));
 
-      setPriceList(sortNourishFirst(priceData || []));
-      setNutrientList(sortNourishFirst(nutrientData || []));
+      // Map Other Ingredients
+      const formattedOther: FeedItem[] = (otherData || []).map((item) => ({
+        id: `other_${item.id}`,
+        name: item.name,
+        price_per_kg: parseFloat(item.price) || 0,
+        feed_type: (item.feed_type || 'concentrate').toLowerCase(),
+        dm_percent: parseFloat(item.dm) || 0,
+        cp_percent: parseFloat(item.cp) || 0,
+        me_energy: parseFloat(item.me) || 0,
+      }));
+
+      const combinedList = [...formattedNourish, ...formattedOther];
+
+      // Sort Nourish items first
+      combinedList.sort((a, b) => {
+        const aIsNourish = a.name.toLowerCase().includes('nourish') || a.id.startsWith('nourish_');
+        const bIsNourish = b.name.toLowerCase().includes('nourish') || b.id.startsWith('nourish_');
+        if (aIsNourish && !bIsNourish) return -1;
+        if (!aIsNourish && bIsNourish) return 1;
+        return 0;
+      });
+
+      setItemList(combinedList);
     } catch (err) {
       console.error('Error fetching calculator data:', err);
     } finally {
@@ -74,11 +88,6 @@ export default function CalculatorPage({ cowData, onEditCowInfo }: CalculatorPag
   const handleQuantityChange = (id: string, val: string) => {
     const num = parseFloat(val) || 0;
     setQuantities((prev) => ({ ...prev, [id]: num }));
-  };
-
-  const isItemSelected = (name: string): boolean => {
-    const item = priceList.find((p) => p.name.trim().toLowerCase() === name.trim().toLowerCase());
-    return item ? (quantities[item.id] || 0) > 0 : false;
   };
 
   const cowType = cowData?.cowType || 'lactating';
@@ -119,38 +128,27 @@ export default function CalculatorPage({ cowData, onEditCowInfo }: CalculatorPag
     }
   }
 
-  const getQtyByName = (name: string): number => {
-    const item = priceList.find((p) => p.name.trim().toLowerCase() === name.trim().toLowerCase());
-    return item ? quantities[item.id] || 0 : 0;
-  };
+  const getItemDMKg = (item: FeedItem): number => ((quantities[item.id] || 0) * (item.dm_percent || 0)) / 100;
+  const getItemCPKg = (item: FeedItem): number => ((quantities[item.id] || 0) * (item.cp_percent || 0)) / 100;
+  const getItemEnergyMJ = (item: FeedItem): number => (quantities[item.id] || 0) * (item.me_energy || 0);
 
-  const getItemDMKg = (item: FeedNutrientItem): number => (getQtyByName(item.name) * (item.dm_percent || 0)) / 100;
-  const getItemCPKg = (item: FeedNutrientItem): number => (getQtyByName(item.name) * (item.cp_percent || 0)) / 100;
-  const getItemEnergyMJ = (item: FeedNutrientItem): number => getQtyByName(item.name) * (item.me_energy || 0);
+  const concentrates = itemList.filter((item) => item.feed_type === 'concentrate');
+  const fodders = itemList.filter((item) => item.feed_type === 'fodder');
 
-  const nutrientConcentrates = nutrientList.filter((item) => item.feed_type?.toLowerCase() === 'concentrate');
-  const nutrientFodders = nutrientList.filter((item) => item.feed_type?.toLowerCase() === 'fodder');
-
-  const dmConcentrateTotal = nutrientConcentrates.reduce((acc, item) => acc + getItemDMKg(item), 0);
-  const dmFodderTotal = nutrientFodders.reduce((acc, item) => acc + getItemDMKg(item), 0);
+  const dmConcentrateTotal = concentrates.reduce((acc, item) => acc + getItemDMKg(item), 0);
+  const dmFodderTotal = fodders.reduce((acc, item) => acc + getItemDMKg(item), 0);
   const totalActualDM = dmConcentrateTotal + dmFodderTotal;
 
-  const cpConcentrateTotal = nutrientConcentrates.reduce((acc, item) => acc + getItemCPKg(item), 0);
-  const cpFodderTotal = nutrientFodders.reduce((acc, item) => acc + getItemCPKg(item), 0);
+  const cpConcentrateTotal = concentrates.reduce((acc, item) => acc + getItemCPKg(item), 0);
+  const cpFodderTotal = fodders.reduce((acc, item) => acc + getItemCPKg(item), 0);
   const totalActualCP = cpConcentrateTotal + cpFodderTotal;
 
-  const energyConcentrateTotal = nutrientConcentrates.reduce((acc, item) => acc + getItemEnergyMJ(item), 0);
-  const energyFodderTotal = nutrientFodders.reduce((acc, item) => acc + getItemEnergyMJ(item), 0);
+  const energyConcentrateTotal = concentrates.reduce((acc, item) => acc + getItemEnergyMJ(item), 0);
+  const energyFodderTotal = fodders.reduce((acc, item) => acc + getItemEnergyMJ(item), 0);
   const totalActualEnergy = energyConcentrateTotal + energyFodderTotal;
 
-  const costConcentrate = priceList
-    .filter((p) => p.feed_type?.toLowerCase() === 'concentrate')
-    .reduce((acc, p) => acc + (quantities[p.id] || 0) * (p.price_per_kg || 0), 0);
-
-  const costFodder = priceList
-    .filter((p) => p.feed_type?.toLowerCase() === 'fodder')
-    .reduce((acc, p) => acc + (quantities[p.id] || 0) * (p.price_per_kg || 0), 0);
-
+  const costConcentrate = concentrates.reduce((acc, item) => acc + (quantities[item.id] || 0) * (item.price_per_kg || 0), 0);
+  const costFodder = fodders.reduce((acc, item) => acc + (quantities[item.id] || 0) * (item.price_per_kg || 0), 0);
   const totalCost = costConcentrate + costFodder;
 
   const dmReq = (bodyWeight * 0.02) + (milkYield * 0.33);
@@ -185,9 +183,6 @@ export default function CalculatorPage({ cowData, onEditCowInfo }: CalculatorPag
       </div>
     );
   }
-
-  const priceConcentrates = priceList.filter((item) => item.feed_type?.toLowerCase() === 'concentrate');
-  const priceFodders = priceList.filter((item) => item.feed_type?.toLowerCase() === 'fodder');
 
   return (
     <div className="w-full space-y-4 sm:space-y-6">
@@ -272,7 +267,7 @@ export default function CalculatorPage({ cowData, onEditCowInfo }: CalculatorPag
                 <tr className="border-b font-bold text-amber-900 text-[10px] sm:text-xs md:text-sm">
                   <td colSpan={3} className="p-2 sm:p-2.5">Concentrate</td>
                 </tr>
-                {priceConcentrates.map((item) => {
+                {concentrates.map((item) => {
                   const isSelected = (quantities[item.id] || 0) > 0;
                   return (
                     <tr 
@@ -302,7 +297,7 @@ export default function CalculatorPage({ cowData, onEditCowInfo }: CalculatorPag
                 <tr className="border-b font-bold text-emerald-900 text-[10px] sm:text-xs md:text-sm">
                   <td colSpan={3} className="p-2 sm:p-2.5 pt-3">Fodder</td>
                 </tr>
-                {priceFodders.map((item) => {
+                {fodders.map((item) => {
                   const isSelected = (quantities[item.id] || 0) > 0;
                   return (
                     <tr 
@@ -355,7 +350,6 @@ export default function CalculatorPage({ cowData, onEditCowInfo }: CalculatorPag
             {/* DYNAMIC SUGGESTION TEXT */}
             {totalActualDM > 0 && (
               <div className="pt-1.5 border-t border-slate-200/60">
-                {/* 1. RATIO IS NOT BALANCED */}
                 {Math.abs(concentrateDiff) > 2 ? (
                   <div className="flex items-center gap-1.5 text-slate-800 font-semibold text-[11px] sm:text-xs leading-snug">
                     <AlertCircle size={15} className="shrink-0 text-amber-600" />
@@ -372,7 +366,6 @@ export default function CalculatorPage({ cowData, onEditCowInfo }: CalculatorPag
                     </div>
                   </div>
                 ) : (
-                  /* 2. RATIO IS BALANCED - SHOW ALL PARAMETERS THAT NEED ADJUSTMENT */
                   <div className="space-y-1">
                     <div className="flex items-center gap-1 text-emerald-700 font-bold text-[11px] sm:text-xs">
                       <CheckCircle2 size={14} className="shrink-0 text-emerald-600" />
@@ -523,8 +516,8 @@ export default function CalculatorPage({ cowData, onEditCowInfo }: CalculatorPag
                 <tr className="font-extrabold text-amber-900 text-xs sm:text-sm">
                   <td colSpan={3} className="p-2 bg-slate-50">Concentrate</td>
                 </tr>
-                {nutrientConcentrates.map((item) => {
-                  const selected = isItemSelected(item.name);
+                {concentrates.map((item) => {
+                  const selected = (quantities[item.id] || 0) > 0;
                   const selectedCellClass = selected ? 'bg-emerald-100/80 font-semibold text-emerald-950' : 'hover:bg-slate-50';
                   return (
                     <tr key={item.id}>
@@ -548,8 +541,8 @@ export default function CalculatorPage({ cowData, onEditCowInfo }: CalculatorPag
                 <tr className="font-extrabold text-emerald-900 text-xs sm:text-sm">
                   <td colSpan={3} className="p-2 pt-3 bg-slate-50">Fodder</td>
                 </tr>
-                {nutrientFodders.map((item) => {
-                  const selected = isItemSelected(item.name);
+                {fodders.map((item) => {
+                  const selected = (quantities[item.id] || 0) > 0;
                   const selectedCellClass = selected ? 'bg-emerald-100/80 font-semibold text-emerald-950' : 'hover:bg-slate-50';
                   return (
                     <tr key={item.id}>
@@ -597,8 +590,8 @@ export default function CalculatorPage({ cowData, onEditCowInfo }: CalculatorPag
                 <tr className="font-extrabold text-amber-900 text-xs sm:text-sm">
                   <td colSpan={3} className="p-2 bg-slate-50">Concentrate</td>
                 </tr>
-                {nutrientConcentrates.map((item) => {
-                  const selected = isItemSelected(item.name);
+                {concentrates.map((item) => {
+                  const selected = (quantities[item.id] || 0) > 0;
                   const selectedCellClass = selected ? 'bg-emerald-100/80 font-semibold text-emerald-950' : 'hover:bg-slate-50';
                   return (
                     <tr key={item.id}>
@@ -622,8 +615,8 @@ export default function CalculatorPage({ cowData, onEditCowInfo }: CalculatorPag
                 <tr className="font-extrabold text-emerald-900 text-xs sm:text-sm">
                   <td colSpan={3} className="p-2 pt-3 bg-slate-50">Fodder</td>
                 </tr>
-                {nutrientFodders.map((item) => {
-                  const selected = isItemSelected(item.name);
+                {fodders.map((item) => {
+                  const selected = (quantities[item.id] || 0) > 0;
                   const selectedCellClass = selected ? 'bg-emerald-100/80 font-semibold text-emerald-950' : 'hover:bg-slate-50';
                   return (
                     <tr key={item.id}>
@@ -671,8 +664,8 @@ export default function CalculatorPage({ cowData, onEditCowInfo }: CalculatorPag
                 <tr className="font-extrabold text-amber-900 text-xs sm:text-sm">
                   <td colSpan={3} className="p-2 bg-slate-50">Concentrate</td>
                 </tr>
-                {nutrientConcentrates.map((item) => {
-                  const selected = isItemSelected(item.name);
+                {concentrates.map((item) => {
+                  const selected = (quantities[item.id] || 0) > 0;
                   const selectedCellClass = selected ? 'bg-emerald-100/80 font-semibold text-emerald-950' : 'hover:bg-slate-50';
                   return (
                     <tr key={item.id}>
@@ -696,8 +689,8 @@ export default function CalculatorPage({ cowData, onEditCowInfo }: CalculatorPag
                 <tr className="font-extrabold text-emerald-900 text-xs sm:text-sm">
                   <td colSpan={3} className="p-2 pt-3 bg-slate-50">Fodder</td>
                 </tr>
-                {nutrientFodders.map((item) => {
-                  const selected = isItemSelected(item.name);
+                {fodders.map((item) => {
+                  const selected = (quantities[item.id] || 0) > 0;
                   const selectedCellClass = selected ? 'bg-emerald-100/80 font-semibold text-emerald-950' : 'hover:bg-slate-50';
                   return (
                     <tr key={item.id}>
