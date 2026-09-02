@@ -136,7 +136,7 @@ export default function CalculatorFatteningPage({ fatteningData, onEditInfo }: C
   let targetConcentratePct = 50;
   let targetFodderPct = 50;
 
-  if (ageMonths >= 24) {
+  if (ageMonths >= 25) {
     stageName = 'Finishing Animal (24M+)';
     targetConcentratePct = 40;
     targetFodderPct = 60;

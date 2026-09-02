@@ -23,3 +23,11 @@ dist-ssr
 *.sln
 *.sw?
 *.env
+
+# Android build & cache files
+android/build/
+android/app/build/
+android/.gradle/
+android/.idea/
+android/local.properties
+android/app/release/

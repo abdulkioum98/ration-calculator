@@ -22,11 +22,11 @@ export default function Navbar({ onOpenSidebar, onGoHome, onGoCalculator, hasCow
           className="flex items-center space-x-2.5 cursor-pointer select-none"
         >
           <img 
-            src="/ration-calculator-logo.png" 
-            alt="Ration Calculator Logo" 
-            className="w-8 h-8 rounded-lg object-contain bg-white/10 p-0.5 border border-white/20 shadow-xs"
+            src="/nourish.png" 
+            alt="Nourish Logo" 
+            className="h-7 w-auto object-contain bg-white/90 p-0.5 rounded-md shadow-xs"
           />
-          <h1 className="text-lg font-bold tracking-tight">Cattle Ration Calc</h1>
+          <h1 className="text-lg font-bold tracking-tight">Ration Calc</h1>
         </div>
       </div>
       
